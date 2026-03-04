@@ -8,7 +8,7 @@ export default function Login() {
 
   function ingresar(e) {
     e.preventDefault()
-    if (pass === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+    if (pass === process.env.ADMIN_PASSWORD) {
       sessionStorage.setItem('admin_auth', '1')
       router.push('/dashboard')
     } else {
