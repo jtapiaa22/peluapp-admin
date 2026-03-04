@@ -8,6 +8,21 @@ export default async function handler(req, res) {
   if (!peluqueria || !machineId || !desde || !hasta)
     return res.status(400).json({ error: 'Faltan campos' })
 
+  if (contacto) {
+    const { data: existente } = await sb
+      .from('licencias_vendidas')
+      .select('id')
+      .eq('contacto', contacto)
+      .eq('machine_id', machineId)
+      .limit(1)
+
+    if (existente?.length > 0) {
+      return res.status(400).json({ 
+        error: 'Esta máquina ya tiene una licencia registrada para ese cliente. Usá "Renovar" desde el detalle.' 
+      })
+    }
+  }
+
   const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY
   const firma = crypto
     .createHmac('sha256', SECRET_KEY)
@@ -16,6 +31,9 @@ export default async function handler(req, res) {
 
   const datos = { app: 'peluapp', machineId, desde, vence: hasta, firma }
   const licBase64 = Buffer.from(JSON.stringify(datos)).toString('base64')
+
+  
+
 
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,

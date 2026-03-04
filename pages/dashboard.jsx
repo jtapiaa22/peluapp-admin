@@ -10,15 +10,15 @@ function diasRestantes(vence) {
 
 function getEstado(vence) {
   const dias = diasRestantes(vence)
-  if (dias < 0)   return { label: 'Vencida',    bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400',    dot: 'bg-red-400',    dias }
+  if (dias < 0)   return { label: 'Vencida',    bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400',    dot: 'bg-red-400',              dias }
   if (dias <= 15) return { label: 'Por vencer', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400 pulse-soft', dias }
-  return              { label: 'Activa',      bg: 'bg-green-500/10',  border: 'border-green-500/20',  text: 'text-green-400',  dot: 'bg-green-400',  dias }
+  return            { label: 'Activa',      bg: 'bg-green-500/10',  border: 'border-green-500/20',  text: 'text-green-400',  dot: 'bg-green-400',            dias }
 }
 
 export default function Dashboard() {
   const router = useRouter()
-  const [historial, setHistorial]   = useState([])
-  const [cargando, setCargando]     = useState(true)
+  const [historial, setHistorial] = useState([])
+  const [cargando, setCargando]   = useState(true)
   const hoy = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
@@ -36,14 +36,21 @@ export default function Dashboard() {
     setCargando(false)
   }
 
-  // Agrupar por peluqueria, quedarme con la más reciente de cada una
   const peluquerias = Object.entries(
     historial.reduce((acc, lic) => {
-      if (!acc[lic.peluqueria]) acc[lic.peluqueria] = []
-      acc[lic.peluqueria].push(lic)
+      const clave = lic.contacto || lic.peluqueria
+      if (!acc[clave]) acc[clave] = []
+      acc[clave].push(lic)
       return acc
     }, {})
-  ).map(([nombre, licencias]) => ({ nombre, licencias, ultima: licencias[0] }))
+  ).map(([clave, licencias]) => ({
+    nombre:   licencias[0].peluqueria,
+    contacto: licencias[0].contacto,
+    clave,
+    licencias,
+    ultima:   licencias.reduce((a, b) => a.vence > b.vence ? a : b),
+    maquinas: [...new Set(licencias.map(l => l.machine_id))].length,
+  }))
 
   const stats = {
     total:     peluquerias.length,
@@ -81,10 +88,10 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total clientes', value: stats.total,     color: 'text-white',        icon: '🏪' },
-            { label: 'Activas',        value: stats.activas,   color: 'text-green-400',    icon: '✅' },
-            { label: 'Por vencer',     value: stats.porVencer, color: 'text-yellow-400',   icon: '⚠️' },
-            { label: 'Vencidas',       value: stats.vencidas,  color: 'text-red-400',      icon: '❌' },
+            { label: 'Total clientes', value: stats.total,     color: 'text-white',      icon: '🏪' },
+            { label: 'Activas',        value: stats.activas,   color: 'text-green-400',  icon: '✅' },
+            { label: 'Por vencer',     value: stats.porVencer, color: 'text-yellow-400', icon: '⚠️' },
+            { label: 'Vencidas',       value: stats.vencidas,  color: 'text-red-400',    icon: '❌' },
           ].map(s => (
             <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
               <div className="text-2xl mb-1">{s.icon}</div>
@@ -94,7 +101,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Grid de peluquerías */}
+        {/* Grid clientes */}
         <h2 className="text-sm font-medium text-zinc-400 mb-4 uppercase tracking-wider">Clientes</h2>
 
         {cargando ? (
@@ -113,15 +120,14 @@ export default function Dashboard() {
             {peluquerias.map(p => {
               const estado = getEstado(p.ultima.vence)
               return (
-                <div key={p.nombre}
+                <div key={p.clave}
                   onClick={() => router.push(`/peluqueria/${encodeURIComponent(p.nombre)}`)}
                   className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30">
 
-                  {/* Nombre + estado */}
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="font-semibold text-white text-base">{p.nombre}</h3>
-                      <p className="text-zinc-500 text-xs mt-0.5">{p.ultima.contacto || 'Sin contacto'}</p>
+                      <p className="text-zinc-500 text-xs mt-0.5">{p.contacto || 'Sin contacto'}</p>
                     </div>
                     <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${estado.bg} ${estado.border} ${estado.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${estado.dot}`}></span>
@@ -129,17 +135,15 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  {/* Días restantes */}
                   <div className={`text-2xl font-bold mb-1 ${estado.text}`}>
                     {estado.dias < 0 ? `Venció hace ${Math.abs(estado.dias)} días` : `${estado.dias} días`}
                   </div>
-                  <div className="text-zinc-600 text-xs mb-4">
-                    Vence: {p.ultima.vence}
-                  </div>
+                  <div className="text-zinc-600 text-xs mb-4">Vence: {p.ultima.vence}</div>
 
-                  {/* Footer */}
                   <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
-                    <span className="text-zinc-600 text-xs">{p.licencias.length} licencia{p.licencias.length !== 1 ? 's' : ''} total</span>
+                    <span className="text-zinc-600 text-xs">
+                      {p.maquinas} máquina{p.maquinas !== 1 ? 's' : ''} · {p.licencias.length} licencia{p.licencias.length !== 1 ? 's' : ''}
+                    </span>
                     <span className="text-violet-400 text-xs font-medium">Ver detalle →</span>
                   </div>
                 </div>
