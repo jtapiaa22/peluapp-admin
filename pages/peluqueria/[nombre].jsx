@@ -230,4 +230,39 @@ export default function DetallePeluqueria() {
                     )}
 
                     {/* Historial de esta máquina */}
-                    <div className="spac
+                    <div className="space-y-2 mt-2">
+                      {maq.licencias.map((lic, j) => {
+                        const est = getEstado(lic.vence)
+                        return (
+                          <div key={lic.id}
+                            className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-2.5 gap-4 flex-wrap">
+                            <div className="flex items-center gap-3">
+                              {j === 0 && (
+                                <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">Actual</span>
+                              )}
+                              <span className="text-sm text-zinc-300">{lic.desde} → {lic.vence}</span>
+                              {lic.notas && <span className="text-xs text-zinc-600">{lic.notas}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${est.bg} ${est.border} ${est.text}`}>
+                                {est.label}
+                              </span>
+                              <button onClick={() => redownload(lic)}
+                                className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors">
+                                ↓ .lic
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
