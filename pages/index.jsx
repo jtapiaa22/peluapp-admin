@@ -6,15 +6,20 @@ export default function Login() {
   const [error, setError] = useState('')
   const router = useRouter()
 
-  function ingresar(e) {
+  async function ingresar(e) {
     e.preventDefault()
-    if (pass === process.env.ADMIN_PASSWORD) {
-      sessionStorage.setItem('admin_auth', '1')
-      router.push('/dashboard')
+    const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass })
+    })
+    if (res.ok) {
+        sessionStorage.setItem('admin_auth', '1')
+        router.push('/dashboard')
     } else {
-      setError('Contraseña incorrecta')
+        setError('Contraseña incorrecta')
     }
-  }
+ }
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
