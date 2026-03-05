@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   // FIX: validar autenticación de admin en cada request
   const auth = req.headers['x-admin-auth']
-  if (!auth || auth !== process.env.ADMIN_SECRET) {
+  if (!auth || auth !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'No autorizado' })
   }
 
