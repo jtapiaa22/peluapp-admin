@@ -76,11 +76,10 @@ export default async function handler(req, res) {
 
   // ── Generación de la licencia ─────────────────────────────────────────
 
-  // Debe coincidir EXACTAMENTE con verificarLicencia() del main.js:
-  // firmaBase = `peluapp${machineId}${desde}${vence}` (sin separadores)
+  // Separador | — igual que el script local: `peluapp|${machineId}|${desde}|${hasta}`
   const firma = crypto
     .createHmac('sha256', SECRET_KEY)
-    .update(`peluapp${machineId}${desde}${hasta}`)
+    .update(`peluapp|${machineId}|${desde}|${hasta}`)
     .digest('hex')
 
   const datos     = { app: 'peluapp', machineId, desde, vence: hasta, firma }
