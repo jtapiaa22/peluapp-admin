@@ -17,7 +17,7 @@ export default function Login() {
     })
     setLoading(false)
     if (res.ok) {
-      sessionStorage.setItem('admin_auth', '1')
+      sessionStorage.setItem('admin_auth', pass)
       router.push('/dashboard')
     } else {
       setError('Contraseña incorrecta')

@@ -163,7 +163,7 @@ export default function DetallePeluqueria() {
         hasta:          form.hasta,
         notas:          form.notas,
         esNuevoCliente: false,
-        esRenovacion:   true,     // ← sin validación de duplicado
+        esRenovacion:   true,
       }),
     })
     const data = await res.json()
