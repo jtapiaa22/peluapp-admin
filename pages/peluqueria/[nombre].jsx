@@ -40,8 +40,9 @@ const FORM_NUEVA_INICIAL = { machineId: '', nombreMaquina: '', desde: fechaHoy()
 
 
 export default function DetallePeluqueria() {
-  const router              = useRouter()
-  const { nombre, isReady } = router
+  const router           = useRouter()
+  const { isReady }      = router
+  const { nombre }       = router.query
 
   const [licencias, setLicencias]   = useState([])
   const [cargando, setCargando]     = useState(true)
@@ -76,9 +77,9 @@ export default function DetallePeluqueria() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!nombre) return
+    if (!isReady || !nombre) return
     cargarLicencias()
-  }, [nombre])
+  }, [isReady, nombre])
 
   async function cargarLicencias() {
     setCargando(true); setErrorCarga(null)
@@ -127,7 +128,7 @@ export default function DetallePeluqueria() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({
           contacto:      licencias[0]?.contacto,
@@ -157,7 +158,7 @@ export default function DetallePeluqueria() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({
           contacto:      licencias[0]?.contacto,
@@ -183,7 +184,7 @@ export default function DetallePeluqueria() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({
           peluqueria:     nombre,
@@ -218,7 +219,7 @@ export default function DetallePeluqueria() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({
           peluqueria:     nombre,
