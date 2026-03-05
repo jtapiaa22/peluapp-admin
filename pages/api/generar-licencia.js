@@ -1,23 +1,56 @@
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
+
+// FIX: singleton — una sola instancia por proceso, no por request
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
+// FIX: clave privada sin prefijo NEXT_PUBLIC_
+const SECRET_KEY = process.env.LIC_SECRET_KEY
+
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas, esNuevoCliente, esRenovacion } = req.body
+  // FIX: validar autenticación de admin en cada request
+  const auth = req.headers['x-admin-auth']
+  if (!auth || auth !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'No autorizado' })
+  }
+
+  const {
+    peluqueria, contacto, machineId, nombreMaquina,
+    desde, hasta, notas, esNuevoCliente, esRenovacion, precio,
+  } = req.body
 
   if (!peluqueria || !machineId || !desde || !hasta)
     return res.status(400).json({ error: 'Faltan campos obligatorios' })
 
-  const sb = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-  )
+  // FIX: validación de fechas en el servidor
+  if (hasta < desde)
+    return res.status(400).json({ error: 'La fecha de vencimiento debe ser posterior a la fecha de inicio.' })
+
+  // ── Validaciones de negocio ───────────────────────────────────────────────
 
   if (esRenovacion) {
-    // Renovar: sin ninguna validación, siempre permitido
+    // FIX: verificar que el machineId pertenece a esa peluquería
+    const { data: maq } = await sb
+      .from('licencias_vendidas')
+      .select('id')
+      .eq('peluqueria', peluqueria)
+      .eq('machine_id', machineId)
+      .limit(1)
+
+    if (!maq?.length) {
+      return res.status(400).json({
+        error: 'No se encontró esa máquina para esta peluquería.',
+      })
+    }
+
   } else if (esNuevoCliente && contacto) {
-    // Desde "Nueva licencia": el contacto no puede existir en absoluto
     const { data: existente } = await sb
       .from('licencias_vendidas')
       .select('id')
@@ -26,11 +59,11 @@ export default async function handler(req, res) {
 
     if (existente?.length > 0) {
       return res.status(400).json({
-        error: `Ya existe un cliente registrado con el contacto "${contacto}". Buscalo en el dashboard y agregá la máquina desde su detalle.`
+        error: `Ya existe un cliente registrado con el contacto "${contacto}". Buscalo en el dashboard y agregá la máquina desde su detalle.`,
       })
     }
+
   } else if (!esNuevoCliente && contacto) {
-    // Agregar nueva máquina: bloquear si esa máquina puntual ya existe
     const { data: existente } = await sb
       .from('licencias_vendidas')
       .select('id')
@@ -40,15 +73,17 @@ export default async function handler(req, res) {
 
     if (existente?.length > 0) {
       return res.status(400).json({
-        error: 'Esta máquina ya tiene una licencia registrada para ese cliente. Usá "Renovar" desde el detalle.'
+        error: 'Esta máquina ya tiene una licencia registrada para ese cliente. Usá "Renovar" desde el detalle.',
       })
     }
   }
 
-  const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY
+  // ── Generación de la licencia ─────────────────────────────────────────────
+
+  // FIX: separador \n en lugar de | para evitar ambigüedad en el HMAC
   const firma = crypto
     .createHmac('sha256', SECRET_KEY)
-    .update(`peluapp|${machineId}|${desde}|${hasta}`)
+    .update(`peluapp\n${machineId}\n${desde}\n${hasta}`)
     .digest('hex')
 
   const datos     = { app: 'peluapp', machineId, desde, vence: hasta, firma }
@@ -63,12 +98,13 @@ export default async function handler(req, res) {
     vence:          hasta,
     lic_base64:     licBase64,
     notas:          notas         || null,
+    precio:         precio ? parseFloat(precio) : null,
   })
 
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({
     licBase64,
-    nombreArchivo: `licencia-${peluqueria.replace(/\s+/g, '-')}-${hasta}.lic`
+    nombreArchivo: `licencia-${peluqueria.replace(/\s+/g, '-')}-${hasta}.lic`,
   })
 }

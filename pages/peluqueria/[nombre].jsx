@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function fechaHoy() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -8,7 +11,7 @@ function fechaHoy() {
 
 function diasRestantes(vence) {
   const hoy = new Date(fechaHoy() + 'T00:00:00')
-  const fv  = new Date(vence + 'T00:00:00')
+  const fv  = new Date(vence    + 'T00:00:00')
   return Math.round((fv - hoy) / (1000 * 60 * 60 * 24)) + 1
 }
 
@@ -19,6 +22,9 @@ function getEstado(vence) {
   return            { label: 'Activa',      text: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dias }
 }
 
+
+// ─── Sub-componente: botones de acción post-generación ───────────────────────
+
 function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, onEnviar }) {
   return (
     <div className="flex gap-3 mt-4">
@@ -28,63 +34,85 @@ function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, on
       </button>
       <button type="button" onClick={onEnviar} disabled={loadingEmail || !contacto}
         className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
-        {loadingEmail ? 'Enviando...' : '✉ Enviar por email'}
+        {loadingEmail ? 'Enviando…' : '✉ Enviar por email'}
       </button>
     </div>
   )
 }
 
-export default function DetallePeluqueria() {
-  const router = useRouter()
-  const { nombre } = router.query
 
-  const [licencias, setLicencias]                 = useState([])
-  const [cargando, setCargando]                   = useState(true)
-  const [copiadoId, setCopiadoId]                 = useState(null)
+// ─── Página principal ────────────────────────────────────────────────────────
+
+const FORM_INICIAL      = { desde: fechaHoy(), hasta: '', notas: '', precio: '' }
+const FORM_NUEVA_INICIAL = { machineId: '', nombreMaquina: '', desde: fechaHoy(), hasta: '', notas: '', precio: '' }
+
+export default function DetallePeluqueria() {
+  const router            = useRouter()
+  const { nombre, isReady } = router   // FIX: isReady evita la race condition
+
+  const [licencias, setLicencias]   = useState([])
+  const [cargando, setCargando]     = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null)   // FIX: estado de error de red
+  const [copiadoId, setCopiadoId]   = useState(null)
 
   // Renovar
-  const [mostrarForm, setMostrarForm]             = useState(false)
-  const [machineIdSeleccionado, setMachineIdSel]  = useState(null)
-  const [nombreMaqSeleccionada, setNombreMaqSel]  = useState(null)
-  const [msg, setMsg]                             = useState(null)
-  const [loadingGen, setLoadingGen]               = useState(false)
-  const [loadingEmailRen, setLoadingEmailRen]     = useState(false)
-  const [licRenovada, setLicRenovada]             = useState(null)
+  const [mostrarForm, setMostrarForm]           = useState(false)
+  const [machineIdSeleccionado, setMachineIdSel] = useState(null)
+  const [nombreMaqSeleccionada, setNombreMaqSel] = useState(null)
+  const [msg, setMsg]                           = useState(null)
+  const [loadingGen, setLoadingGen]             = useState(false)
+  const [loadingEmailRen, setLoadingEmailRen]   = useState(false)
+  const [licRenovada, setLicRenovada]           = useState(null)
+  const [form, setForm]                         = useState(FORM_INICIAL)
 
   // Nueva máquina
-  const [mostrarFormNueva, setMostrarFormNueva]   = useState(false)
-  const [msgNueva, setMsgNueva]                   = useState(null)
-  const [loadingNueva, setLoadingNueva]           = useState(false)
-  const [loadingEmailNueva, setLoadingEmailNueva] = useState(false)
-  const [licNueva, setLicNueva]                   = useState(null)
+  const [mostrarFormNueva, setMostrarFormNueva]     = useState(false)
+  const [msgNueva, setMsgNueva]                     = useState(null)
+  const [loadingNueva, setLoadingNueva]             = useState(false)
+  const [loadingEmailNueva, setLoadingEmailNueva]   = useState(false)
+  const [licNueva, setLicNueva]                     = useState(null)
+  const [formNueva, setFormNueva]                   = useState(FORM_NUEVA_INICIAL)
 
-  // Email desde historial — guarda { licId, loading }
-  const [emailHistorial, setEmailHistorial]       = useState({})
+  // Email desde historial
+  const [emailHistorial, setEmailHistorial] = useState({})
 
-  const hoy = fechaHoy()
-  const [form, setForm]           = useState({ desde: hoy, hasta: '', notas: '' })
-  const [formNueva, setFormNueva] = useState({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
+  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
+
+  // ── Auth guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!sessionStorage.getItem('admin_auth')) { router.push('/'); return }
-  }, [])
+    if (!sessionStorage.getItem('admin_auth')) router.push('/')
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
+
+  // ── Carga de licencias (FIX: espera isReady) ───────────────────────────────
   useEffect(() => {
-    if (!nombre) return
+    if (!isReady || !nombre) return
     cargarLicencias()
-  }, [nombre])
+  }, [isReady, nombre])   // eslint-disable-line react-hooks/exhaustive-deps
+
 
   async function cargarLicencias() {
     setCargando(true)
-    const auth = sessionStorage.getItem('admin_auth')
-    const res = await fetch(`/api/licencias?nombre=${encodeURIComponent(nombre)}`, {
-      headers: { 'x-admin-auth': auth }
-    })
-    if (res.status === 401) { sessionStorage.clear(); router.push('/'); return }
-    const data = await res.json()
-    setLicencias(data || [])
-    setCargando(false)
+    setErrorCarga(null)
+    try {   // FIX: try/catch para errores de red
+      const auth = sessionStorage.getItem('admin_auth')
+      const res  = await fetch(`/api/licencias?nombre=${encodeURIComponent(nombre)}`, {
+        headers: { 'x-admin-auth': auth },
+      })
+      if (res.status === 401) { sessionStorage.clear(); router.push('/'); return }
+      const data = await res.json()
+      setLicencias(data || [])
+    } catch (err) {
+      console.error('Error al cargar licencias:', err)
+      setErrorCarga('No se pudo conectar con el servidor. Revisá tu conexión.')
+    } finally {
+      setCargando(false)
+    }
   }
+
+
+  // ── Helpers UI ─────────────────────────────────────────────────────────────
 
   function copiar(machineId) {
     navigator.clipboard.writeText(machineId)
@@ -96,7 +124,7 @@ export default function DetallePeluqueria() {
     const blob = new Blob([lic.lic_base64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href = url
+    a.href     = url
     a.download = `licencia-${lic.peluqueria.replace(/\s+/g, '-')}-${lic.vence}.lic`
     a.click()
     URL.revokeObjectURL(url)
@@ -110,111 +138,142 @@ export default function DetallePeluqueria() {
     URL.revokeObjectURL(url)
   }
 
+
+  // ── Email ──────────────────────────────────────────────────────────────────
+
   async function enviarEmailLic(licData, setLoadingFn, setMsgFn) {
     setLoadingFn(true)
-    const res = await fetch('/api/enviar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contacto:      licencias[0]?.contacto,
-        peluqueria:    nombre,
-        licBase64:     licData.licBase64,
-        nombreArchivo: licData.nombreArchivo,
-        vence:         licData.vence,
-      }),
-    })
-    setLoadingFn(false)
-    setMsgFn({
-      tipo:  res.ok ? 'ok' : 'error',
-      texto: res.ok ? `✅ Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email',
-    })
+    try {   // FIX: try/catch
+      const res = await fetch('/api/enviar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contacto:      licencias[0]?.contacto,
+          peluqueria:    nombre,
+          licBase64:     licData.licBase64,
+          nombreArchivo: licData.nombreArchivo,
+          vence:         licData.vence,
+        }),
+      })
+      setMsgFn({
+        tipo:  res.ok ? 'ok' : 'error',
+        texto: res.ok
+          ? `✅ Email enviado a ${licencias[0]?.contacto}`
+          : 'Error al enviar el email',
+      })
+    } catch {
+      setMsgFn({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
+    } finally {
+      setLoadingFn(false)
+    }
   }
 
-  // Enviar email directo desde una fila del historial
   async function enviarEmailHistorial(lic) {
     setEmailHistorial(prev => ({ ...prev, [lic.id]: 'loading' }))
-    const res = await fetch('/api/enviar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contacto:      licencias[0]?.contacto,
-        peluqueria:    nombre,
-        licBase64:     lic.lic_base64,
-        nombreArchivo: `licencia-${nombre.replace(/\s+/g, '-')}-${lic.vence}.lic`,
-        vence:         lic.vence,
-      }),
-    })
-    setEmailHistorial(prev => ({ ...prev, [lic.id]: res.ok ? 'ok' : 'error' }))
-    setTimeout(() => setEmailHistorial(prev => ({ ...prev, [lic.id]: null })), 3000)
+    try {   // FIX: try/catch
+      const res = await fetch('/api/enviar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contacto:      licencias[0]?.contacto,
+          peluqueria:    nombre,
+          licBase64:     lic.lic_base64,
+          nombreArchivo: `licencia-${nombre.replace(/\s+/g, '-')}-${lic.vence}.lic`,
+          vence:         lic.vence,
+        }),
+      })
+      setEmailHistorial(prev => ({ ...prev, [lic.id]: res.ok ? 'ok' : 'error' }))
+    } catch {
+      setEmailHistorial(prev => ({ ...prev, [lic.id]: 'error' }))
+    } finally {
+      setTimeout(() => setEmailHistorial(prev => ({ ...prev, [lic.id]: null })), 3000)
+    }
   }
+
+
+  // ── Formularios ────────────────────────────────────────────────────────────
 
   async function renovar(e) {
     e.preventDefault()
     setLoadingGen(true); setMsg(null); setLicRenovada(null)
-    const res = await fetch('/api/generar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        peluqueria:     nombre,
-        contacto:       licencias[0]?.contacto || '',
-        machineId:      machineIdSeleccionado,
-        nombreMaquina:  nombreMaqSeleccionada,
-        desde:          form.desde,
-        hasta:          form.hasta,
-        notas:          form.notas,
-        esNuevoCliente: false,
-        esRenovacion:   true,
-      }),
-    })
-    const data = await res.json()
-    setLoadingGen(false)
-    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
-
-    setLicRenovada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
-    setMsg({ tipo: 'ok', texto: '✅ Licencia renovada correctamente' })
-    cargarLicencias()
+    try {   // FIX: try/catch
+      const res  = await fetch('/api/generar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peluqueria:    nombre,
+          contacto:      licencias[0]?.contacto || '',
+          machineId:     machineIdSeleccionado,
+          nombreMaquina: nombreMaqSeleccionada,
+          desde:         form.desde,
+          hasta:         form.hasta,
+          notas:         form.notas,
+          precio:        form.precio,
+          esNuevoCliente: false,
+          esRenovacion:   true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
+      setLicRenovada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
+      setMsg({ tipo: 'ok', texto: '✅ Licencia renovada correctamente' })
+      cargarLicencias()
+    } catch {
+      setMsg({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
+    } finally {
+      setLoadingGen(false)
+    }
   }
 
   async function agregarMaquina(e) {
     e.preventDefault()
     setLoadingNueva(true); setMsgNueva(null); setLicNueva(null)
-    const res = await fetch('/api/generar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        peluqueria:     nombre,
-        contacto:       licencias[0]?.contacto || '',
-        machineId:      formNueva.machineId,
-        nombreMaquina:  formNueva.nombreMaquina,
-        desde:          formNueva.desde,
-        hasta:          formNueva.hasta,
-        notas:          formNueva.notas,
-        esNuevoCliente: false,
-        esRenovacion:   false,
-      }),
-    })
-    const data = await res.json()
-    setLoadingNueva(false)
-    if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
-
-    setLicNueva({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: formNueva.hasta })
-    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada correctamente' })
-    cargarLicencias()
+    try {   // FIX: try/catch
+      const res  = await fetch('/api/generar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peluqueria:    nombre,
+          contacto:      licencias[0]?.contacto || '',
+          machineId:     formNueva.machineId,
+          nombreMaquina: formNueva.nombreMaquina,
+          desde:         formNueva.desde,
+          hasta:         formNueva.hasta,
+          notas:         formNueva.notas,
+          precio:        formNueva.precio,
+          esNuevoCliente: false,
+          esRenovacion:   false,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
+      setLicNueva({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: formNueva.hasta })
+      setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada correctamente' })
+      cargarLicencias()
+    } catch {
+      setMsgNueva({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
+    } finally {
+      setLoadingNueva(false)
+    }
   }
 
+
+  // ── Derivados ──────────────────────────────────────────────────────────────
+
+  // FIX: ordenar licencias de cada máquina por fecha descendente → lics[0] siempre es la más reciente
   const maquinas = Object.entries(
     licencias.reduce((acc, lic) => {
       if (!acc[lic.machine_id]) acc[lic.machine_id] = []
       acc[lic.machine_id].push(lic)
       return acc
     }, {})
-  ).map(([machineId, lics]) => ({
-    machineId,
-    licencias: lics,
-    ultima: lics[0],
-  }))
+  ).map(([machineId, lics]) => {
+    const ordenadas = [...lics].sort((a, b) => new Date(b.vence) - new Date(a.vence))
+    return { machineId, licencias: ordenadas, ultima: ordenadas[0] }
+  })
 
-  const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -232,8 +291,19 @@ export default function DetallePeluqueria() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8 fade-in">
+
+        {/* FIX: estado de error de red */}
+        {errorCarga && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-6">
+            {errorCarga}
+            <button onClick={cargarLicencias} className="ml-3 underline hover:no-underline">
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {cargando ? (
-          <div className="text-zinc-600 text-sm">Cargando...</div>
+          <div className="text-zinc-600 text-sm">Cargando…</div>
         ) : (
           <>
             {/* Info cliente */}
@@ -263,6 +333,7 @@ export default function DetallePeluqueria() {
                     setNombreMaqSel(null); setLicRenovada(null); setMsg(null)
                   }} className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
@@ -273,6 +344,12 @@ export default function DetallePeluqueria() {
                     <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
                     <input type="date" className={inp} required value={form.hasta}
                       onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
+                  </div>
+                  {/* FIX: campo precio agregado */}
+                  <div className="col-span-2">
+                    <label className="text-xs text-zinc-400 mb-1.5 block">Precio</label>
+                    <input className={inp} value={form.precio} placeholder="Ej: 5000"
+                      onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
@@ -296,7 +373,7 @@ export default function DetallePeluqueria() {
                 ) : (
                   <button type="submit" disabled={loadingGen}
                     className="mt-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors">
-                    {loadingGen ? 'Generando...' : 'Generar renovación'}
+                    {loadingGen ? 'Generando…' : 'Generar renovación'}
                   </button>
                 )}
               </form>
@@ -319,6 +396,7 @@ export default function DetallePeluqueria() {
                     <button type="button" onClick={() => { setMostrarFormNueva(false); setLicNueva(null); setMsgNueva(null) }}
                       className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="text-xs text-zinc-400 mb-1.5 block">Nombre descriptivo de la PC</label>
@@ -341,6 +419,12 @@ export default function DetallePeluqueria() {
                       <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
                       <input type="date" className={inp} required value={formNueva.hasta}
                         onChange={e => setFormNueva(f => ({ ...f, hasta: e.target.value }))} />
+                    </div>
+                    {/* FIX: campo precio agregado */}
+                    <div className="col-span-2">
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Precio</label>
+                      <input className={inp} value={formNueva.precio} placeholder="Ej: 5000"
+                        onChange={e => setFormNueva(f => ({ ...f, precio: e.target.value }))} />
                     </div>
                     <div className="col-span-2">
                       <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
@@ -366,7 +450,7 @@ export default function DetallePeluqueria() {
                   ) : (
                     <button type="submit" disabled={loadingNueva}
                       className="mt-4 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50">
-                      {loadingNueva ? 'Generando...' : 'Generar licencia'}
+                      {loadingNueva ? 'Generando…' : 'Generar licencia'}
                     </button>
                   )}
                 </form>
@@ -378,98 +462,103 @@ export default function DetallePeluqueria() {
               Máquinas registradas
             </h2>
 
-            <div className="space-y-4">
-              {maquinas.map((maq, i) => {
-                const estado = getEstado(maq.ultima.vence)
-                return (
-                  <div key={maq.machineId} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            {/* FIX: estado vacío */}
+            {maquinas.length === 0 ? (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-600 text-sm">
+                No hay máquinas registradas para este cliente.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {maquinas.map((maq, i) => {
+                  const estado = getEstado(maq.ultima.vence)
+                  return (
+                    <div key={maq.machineId} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
 
-                    <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-                      <div>
-                        <p className="text-xs text-zinc-500 mb-1">Máquina {i + 1}</p>
-                        <p className="text-white font-semibold text-base mb-2">
-                          {maq.ultima.nombre_maquina || <span className="text-zinc-500 font-normal italic">Sin nombre</span>}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <code className="text-violet-400 text-xs bg-violet-400/10 px-3 py-1.5 rounded-lg break-all">
-                            {maq.machineId}
-                          </code>
-                          <button onClick={() => copiar(maq.machineId)}
-                            className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                            {copiadoId === maq.machineId ? '✓ Copiado' : 'Copiar'}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${estado.bg} ${estado.border} ${estado.text}`}>
-                          {estado.label}
-                        </span>
-                        <div className={`text-xl font-bold mt-1 ${estado.text}`}>
-                          {estado.dias < 0 ? `Venció hace ${Math.abs(estado.dias)}d` : `${estado.dias} días`}
-                        </div>
-                        <div className="text-zinc-600 text-xs">Vence: {maq.ultima.vence}</div>
-                      </div>
-                    </div>
-
-                    {!mostrarForm && (
-                      <button onClick={() => {
-                        setMachineIdSel(maq.machineId)
-                        setNombreMaqSel(maq.ultima.nombre_maquina || null)
-                        setMostrarForm(true)
-                        setLicRenovada(null)
-                        setMsg(null)
-                        setForm({ desde: hoy, hasta: '', notas: '' })
-                        window.scrollTo({ top: 0, behavior: 'smooth' })
-                      }}
-                        className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-400/60 px-3 py-1.5 rounded-lg transition-colors mb-4">
-                        ↻ Renovar esta máquina
-                      </button>
-                    )}
-
-                    {/* Historial */}
-                    <div className="space-y-2 mt-2">
-                      {maq.licencias.map((lic, j) => {
-                        const est        = getEstado(lic.vence)
-                        const emailState = emailHistorial[lic.id]
-                        return (
-                          <div key={lic.id}
-                            className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-2.5 gap-4 flex-wrap">
-                            <div className="flex items-center gap-3">
-                              {j === 0 && (
-                                <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">Actual</span>
-                              )}
-                              <span className="text-sm text-zinc-300">{lic.desde} → {lic.vence}</span>
-                              {lic.notas && <span className="text-xs text-zinc-600">{lic.notas}</span>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${est.bg} ${est.border} ${est.text}`}>
-                                {est.label}
-                              </span>
-                              {/* Descargar */}
-                              <button onClick={() => descargarLic(lic)}
-                                className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors">
-                                ⬇ .lic
-                              </button>
-                              {/* Enviar por email */}
-                              {licencias[0]?.contacto && (
-                                <button onClick={() => enviarEmailHistorial(lic)}
-                                  disabled={emailState === 'loading'}
-                                  className="text-xs text-violet-400 hover:text-violet-300 disabled:opacity-50 border border-violet-400/30 hover:border-violet-400/60 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                                  {emailState === 'loading' ? '...'
-                                    : emailState === 'ok'    ? '✓ Enviado'
-                                    : emailState === 'error' ? '✗ Error'
-                                    : '✉'}
-                                </button>
-                              )}
-                            </div>
+                      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-1">Máquina {i + 1}</p>
+                          <p className="text-white font-semibold text-base mb-2">
+                            {maq.ultima.nombre_maquina || <span className="text-zinc-500 font-normal italic">Sin nombre</span>}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-violet-400 text-xs bg-violet-400/10 px-3 py-1.5 rounded-lg break-all">
+                              {maq.machineId}
+                            </code>
+                            <button onClick={() => copiar(maq.machineId)}
+                              className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                              {copiadoId === maq.machineId ? '✓ Copiado' : 'Copiar'}
+                            </button>
                           </div>
-                        )
-                      })}
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${estado.bg} ${estado.border} ${estado.text}`}>
+                            {estado.label}
+                          </span>
+                          <div className={`text-xl font-bold mt-1 ${estado.text}`}>
+                            {estado.dias < 0 ? `Venció hace ${Math.abs(estado.dias)}d` : `${estado.dias} días`}
+                          </div>
+                          <div className="text-zinc-600 text-xs">Vence: {maq.ultima.vence}</div>
+                        </div>
+                      </div>
+
+                      {!mostrarForm && (
+                        <button onClick={() => {
+                          setMachineIdSel(maq.machineId)
+                          setNombreMaqSel(maq.ultima.nombre_maquina || null)
+                          setMostrarForm(true)
+                          setLicRenovada(null)
+                          setMsg(null)
+                          setForm(FORM_INICIAL)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                          className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-400/60 px-3 py-1.5 rounded-lg transition-colors mb-4">
+                          ↻ Renovar esta máquina
+                        </button>
+                      )}
+
+                      {/* Historial */}
+                      <div className="space-y-2 mt-2">
+                        {maq.licencias.map((lic, j) => {
+                          const est        = getEstado(lic.vence)
+                          const emailState = emailHistorial[lic.id]
+                          return (
+                            <div key={lic.id}
+                              className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-2.5 gap-4 flex-wrap">
+                              <div className="flex items-center gap-3">
+                                {j === 0 && (
+                                  <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">Actual</span>
+                                )}
+                                <span className="text-sm text-zinc-300">{lic.desde} → {lic.vence}</span>
+                                {lic.notas && <span className="text-xs text-zinc-600">{lic.notas}</span>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${est.bg} ${est.border} ${est.text}`}>
+                                  {est.label}
+                                </span>
+                                <button onClick={() => descargarLic(lic)}
+                                  className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors">
+                                  ⬇ .lic
+                                </button>
+                                {licencias[0]?.contacto && (
+                                  <button onClick={() => enviarEmailHistorial(lic)}
+                                    disabled={emailState === 'loading'}
+                                    className="text-xs text-violet-400 hover:text-violet-300 disabled:opacity-50 border border-violet-400/30 hover:border-violet-400/60 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                                    {emailState === 'loading' ? '…'
+                                      : emailState === 'ok'    ? '✓ Enviado'
+                                      : emailState === 'error' ? '✗ Error'
+                                      : '✉'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

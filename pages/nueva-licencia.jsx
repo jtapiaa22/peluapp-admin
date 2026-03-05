@@ -1,46 +1,69 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
 
 function fechaHoy() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+const FORM_INICIAL = {
+  peluqueria:    '',
+  contacto:      '',
+  machineId:     '',
+  nombreMaquina: '',
+  desde:         fechaHoy(),
+  hasta:         '',
+  notas:         '',
+  precio:        '',
+}
+
+
+// ─── Página ───────────────────────────────────────────────────────────────────
+
 export default function NuevaLicencia() {
   const router = useRouter()
 
-  const [form, setForm] = useState({
-    peluqueria:    '',
-    contacto:      '',
-    machineId:     '',
-    nombreMaquina: '',
-    desde:         fechaHoy(),
-    hasta:         '',
-    notas:         '',
-  })
+  const [form, setForm]               = useState(FORM_INICIAL)
   const [loading, setLoading]         = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
   const [msg, setMsg]                 = useState(null)
-  const [licGenerada, setLicGenerada] = useState(null) // { licBase64, nombreArchivo, vence }
+  const [licGenerada, setLicGenerada] = useState(null)
 
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
+  // FIX: auth guard
+  useEffect(() => {
+    if (!sessionStorage.getItem('admin_auth')) router.push('/')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function generar(e) {
     e.preventDefault()
-    setLoading(true); setMsg(null); setLicGenerada(null)
 
-    const res = await fetch('/api/generar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, esNuevoCliente: true }),
-    })
-    const data = await res.json()
-    setLoading(false)
+    // FIX: validación de fechas
+    if (form.hasta && form.hasta < form.desde) {
+      setMsg({ tipo: 'error', texto: 'La fecha de vencimiento debe ser posterior a la fecha de inicio.' })
+      return
+    }
 
-    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
-
-    setLicGenerada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
-    setMsg({ tipo: 'ok', texto: '✅ Licencia generada correctamente' })
+    setMsg(null); setLicGenerada(null); setLoading(true)
+    try {   // FIX: try/catch/finally
+      const res  = await fetch('/api/generar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ ...form, esNuevoCliente: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
+      setLicGenerada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
+      setMsg({ tipo: 'ok', texto: '✅ Licencia generada correctamente' })
+    } catch {
+      setMsg({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
+    } finally {
+      setLoading(false)   // FIX: siempre se ejecuta, incluso si res.json() falla
+    }
   }
 
   function descargar() {
@@ -53,23 +76,35 @@ export default function NuevaLicencia() {
 
   async function enviarEmail() {
     setLoadingEmail(true)
-    const res = await fetch('/api/enviar-licencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contacto:      form.contacto,
-        peluqueria:    form.peluqueria,
-        licBase64:     licGenerada.licBase64,
-        nombreArchivo: licGenerada.nombreArchivo,
-        vence:         licGenerada.vence,
-      }),
-    })
-    setLoadingEmail(false)
-    if (res.ok) {
-      setMsg({ tipo: 'ok', texto: `✅ Email enviado a ${form.contacto}` })
-    } else {
-      setMsg({ tipo: 'error', texto: 'Error al enviar el email' })
+    try {   // FIX: try/catch/finally
+      const res = await fetch('/api/enviar-licencia', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          contacto:      form.contacto,
+          peluqueria:    form.peluqueria,
+          licBase64:     licGenerada.licBase64,
+          nombreArchivo: licGenerada.nombreArchivo,
+          vence:         licGenerada.vence,
+        }),
+      })
+      setMsg(
+        res.ok
+          ? { tipo: 'ok',    texto: `✅ Email enviado a ${form.contacto}` }
+          : { tipo: 'error', texto: 'Error al enviar el email' }
+      )
+    } catch {
+      setMsg({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
+    } finally {
+      setLoadingEmail(false)
     }
+  }
+
+  // FIX: limpia todo para cargar otra licencia sin recargar la página
+  function nuevaLicencia() {
+    setForm(FORM_INICIAL)
+    setLicGenerada(null)
+    setMsg(null)
   }
 
   return (
@@ -105,7 +140,7 @@ export default function NuevaLicencia() {
 
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Contacto / Email *</label>
-            <input className={inp} required value={form.contacto}
+            <input className={inp} required type="email" value={form.contacto}
               placeholder="Ej: jofre@gmail.com"
               onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
             <p className="text-xs text-zinc-600 mt-1">El email identifica al cliente y recibe la licencia. No puede repetirse.</p>
@@ -133,16 +168,27 @@ export default function NuevaLicencia() {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
-              <input type="date" className={inp} required value={form.hasta}
+              {/* FIX: min evita seleccionar una fecha anterior a "desde" directo desde el picker */}
+              <input type="date" className={inp} required value={form.hasta} min={form.desde}
                 onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
             </div>
           </div>
 
-          <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
-            <input className={inp} value={form.notas}
-              placeholder="Ej: pagó 3 meses, descuento aplicado"
-              onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+          {/* FIX: precio y notas en el mismo grid, sin duplicar notas */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
+              {/* FIX: min="0" para no permitir precios negativos */}
+              <input type="number" min="0" className={inp} value={form.precio}
+                placeholder="Ej: 20000"
+                onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
+              <input className={inp} value={form.notas}
+                placeholder="Ej: pagó 3 meses, descuento"
+                onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+            </div>
           </div>
 
           {/* Mensaje */}
@@ -156,7 +202,7 @@ export default function NuevaLicencia() {
             </div>
           )}
 
-          {/* Botones post-generación */}
+          {/* Botones */}
           {licGenerada ? (
             <div className="flex gap-3">
               <button type="button" onClick={descargar}
@@ -165,22 +211,28 @@ export default function NuevaLicencia() {
               </button>
               <button type="button" onClick={enviarEmail} disabled={loadingEmail || !form.contacto}
                 className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium py-3 rounded-xl text-sm transition-colors">
-                {loadingEmail ? 'Enviando...' : `✉ Enviar a ${form.contacto}`}
+                {loadingEmail ? 'Enviando…' : `✉ Enviar a ${form.contacto}`}
               </button>
             </div>
           ) : (
             <button type="submit" disabled={loading}
               className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-violet-900/20">
-              {loading ? 'Generando...' : 'Generar licencia'}
+              {loading ? 'Generando…' : 'Generar licencia'}
             </button>
           )}
 
-          {/* Ir al dashboard luego de generar */}
+          {/* FIX: acciones post-generación con opción de cargar otra */}
           {licGenerada && (
-            <button type="button" onClick={() => router.push('/dashboard')}
-              className="text-zinc-500 hover:text-white text-sm text-center transition-colors">
-              Ir al dashboard →
-            </button>
+            <div className="flex items-center justify-between pt-1">
+              <button type="button" onClick={nuevaLicencia}
+                className="text-zinc-500 hover:text-white text-sm transition-colors">
+                + Cargar otra licencia
+              </button>
+              <button type="button" onClick={() => router.push('/dashboard')}
+                className="text-zinc-500 hover:text-white text-sm transition-colors">
+                Ir al dashboard →
+              </button>
+            </div>
           )}
 
         </form>
