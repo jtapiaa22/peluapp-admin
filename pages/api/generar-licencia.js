@@ -4,18 +4,32 @@ import { createClient } from '@supabase/supabase-js'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas } = req.body
-  if (!peluqueria || !machineId || !desde || !hasta)
-    return res.status(400).json({ error: 'Faltan campos' })
+  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas, esNuevoCliente } = req.body
 
+  if (!peluqueria || !machineId || !desde || !hasta)
+    return res.status(400).json({ error: 'Faltan campos obligatorios' })
 
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  // Validar duplicado
-  if (contacto) {
+  // Validación según origen
+  if (esNuevoCliente && contacto) {
+    // Desde "Nueva licencia": el contacto no puede existir en absoluto
+    const { data: existente } = await sb
+      .from('licencias_vendidas')
+      .select('id')
+      .eq('contacto', contacto)
+      .limit(1)
+
+    if (existente?.length > 0) {
+      return res.status(400).json({
+        error: `Ya existe un cliente registrado con el contacto "${contacto}". Buscalo en el dashboard y agregá la máquina desde su detalle.`
+      })
+    }
+  } else if (!esNuevoCliente && contacto) {
+    // Desde "Agregar máquina": solo bloquear si esa máquina puntual ya está registrada
     const { data: existente } = await sb
       .from('licencias_vendidas')
       .select('id')
@@ -29,6 +43,7 @@ export default async function handler(req, res) {
       })
     }
   }
+  // Renovar: sin validación de duplicado, siempre permitido
 
   const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY
   const firma = crypto
@@ -36,15 +51,18 @@ export default async function handler(req, res) {
     .update(`peluapp|${machineId}|${desde}|${hasta}`)
     .digest('hex')
 
-  const datos = { app: 'peluapp', machineId, desde, vence: hasta, firma }
+  const datos    = { app: 'peluapp', machineId, desde, vence: hasta, firma }
   const licBase64 = Buffer.from(JSON.stringify(datos)).toString('base64')
 
   const { error } = await sb.from('licencias_vendidas').insert({
-    peluqueria, contacto: contacto || null,
-    machine_id: machineId,
-    nombre_maquina: nombreMaquina || null,
-    desde, vence: hasta,
-    lic_base64: licBase64, notas: notas || null,
+    peluqueria,
+    contacto:       contacto       || null,
+    machine_id:     machineId,
+    nombre_maquina: nombreMaquina  || null,
+    desde,
+    vence:          hasta,
+    lic_base64:     licBase64,
+    notas:          notas          || null,
   })
 
   if (error) return res.status(500).json({ error: error.message })

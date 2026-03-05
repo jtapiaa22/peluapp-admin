@@ -82,13 +82,14 @@ export default function DetallePeluqueria() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        peluqueria:    nombre,
-        contacto:      licencias[0]?.contacto || '',
-        machineId:     machineIdSeleccionado,
-        nombreMaquina: nombreMaqSeleccionada,
-        desde:         form.desde,
-        hasta:         form.hasta,
-        notas:         form.notas,
+        peluqueria:     nombre,
+        contacto:       licencias[0]?.contacto || '',
+        machineId:      machineIdSeleccionado,
+        nombreMaquina:  nombreMaqSeleccionada,
+        desde:          form.desde,
+        hasta:          form.hasta,
+        notas:          form.notas,
+        esNuevoCliente: false,
       }),
     })
     const data = await res.json()
@@ -116,13 +117,14 @@ export default function DetallePeluqueria() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        peluqueria:    nombre,
-        contacto:      licencias[0]?.contacto || '',
-        machineId:     formNueva.machineId,
-        nombreMaquina: formNueva.nombreMaquina,
-        desde:         formNueva.desde,
-        hasta:         formNueva.hasta,
-        notas:         formNueva.notas,
+        peluqueria:     nombre,
+        contacto:       licencias[0]?.contacto || '',
+        machineId:      formNueva.machineId,
+        nombreMaquina:  formNueva.nombreMaquina,
+        desde:          formNueva.desde,
+        hasta:          formNueva.hasta,
+        notas:          formNueva.notas,
+        esNuevoCliente: false,  // ← clave: no valida duplicado de contacto
       }),
     })
     const data = await res.json()
@@ -297,11 +299,9 @@ export default function DetallePeluqueria() {
                 return (
                   <div key={maq.machineId} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
 
-                    {/* Header máquina */}
                     <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
                       <div>
                         <p className="text-xs text-zinc-500 mb-1">Máquina {i + 1}</p>
-                        {/* Nombre descriptivo */}
                         <p className="text-white font-semibold text-base mb-2">
                           {maq.ultima.nombre_maquina || <span className="text-zinc-500 font-normal italic">Sin nombre</span>}
                         </p>
