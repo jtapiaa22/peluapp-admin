@@ -20,6 +20,14 @@ function getEstado(vence) {
   return            { label: 'Activa',      text: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dias }
 }
 
+async function enviarEmail({ contacto, peluqueria, licBase64, nombreArchivo, vence }) {
+  await fetch('/api/enviar-licencia', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contacto, peluqueria, licBase64, nombreArchivo, vence }),
+  })
+}
+
 export default function DetallePeluqueria() {
   const router = useRouter()
   const { nombre } = router.query
@@ -81,6 +89,7 @@ export default function DetallePeluqueria() {
   async function renovar(e) {
     e.preventDefault()
     setLoadingGen(true); setMsg(null)
+
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,16 +105,32 @@ export default function DetallePeluqueria() {
       }),
     })
     const data = await res.json()
-    setLoadingGen(false)
-    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
 
+    if (!res.ok) {
+      setLoadingGen(false)
+      return setMsg({ tipo: 'error', texto: data.error })
+    }
+
+    // Descargar localmente
     const blob = new Blob([data.licBase64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url; a.download = data.nombreArchivo; a.click()
     URL.revokeObjectURL(url)
 
-    setMsg({ tipo: 'ok', texto: '✅ Licencia renovada y descargada' })
+    // Enviar por email
+    if (licencias[0]?.contacto) {
+      await enviarEmail({
+        contacto:      licencias[0].contacto,
+        peluqueria:    nombre,
+        licBase64:     data.licBase64,
+        nombreArchivo: data.nombreArchivo,
+        vence:         form.hasta,
+      })
+    }
+
+    setLoadingGen(false)
+    setMsg({ tipo: 'ok', texto: '✅ Licencia renovada, descargada y enviada por email' })
     setMostrarForm(false)
     setMachineIdSel(null)
     setNombreMaqSel(null)
@@ -116,6 +141,7 @@ export default function DetallePeluqueria() {
   async function agregarMaquina(e) {
     e.preventDefault()
     setLoadingNueva(true); setMsgNueva(null)
+
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,16 +157,32 @@ export default function DetallePeluqueria() {
       }),
     })
     const data = await res.json()
-    setLoadingNueva(false)
-    if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
 
+    if (!res.ok) {
+      setLoadingNueva(false)
+      return setMsgNueva({ tipo: 'error', texto: data.error })
+    }
+
+    // Descargar localmente
     const blob = new Blob([data.licBase64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url; a.download = data.nombreArchivo; a.click()
     URL.revokeObjectURL(url)
 
-    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada y .lic descargado' })
+    // Enviar por email
+    if (licencias[0]?.contacto) {
+      await enviarEmail({
+        contacto:      licencias[0].contacto,
+        peluqueria:    nombre,
+        licBase64:     data.licBase64,
+        nombreArchivo: data.nombreArchivo,
+        vence:         formNueva.hasta,
+      })
+    }
+
+    setLoadingNueva(false)
+    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada, .lic descargado y enviado por email' })
     setMostrarFormNueva(false)
     setFormNueva({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
     cargarLicencias()
@@ -227,7 +269,7 @@ export default function DetallePeluqueria() {
                 )}
                 <button type="submit" disabled={loadingGen}
                   className="mt-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors">
-                  {loadingGen ? 'Generando...' : '⬇ Generar y descargar .lic'}
+                  {loadingGen ? 'Generando y enviando...' : '⬇ Renovar y enviar por email'}
                 </button>
               </form>
             )}
@@ -285,7 +327,7 @@ export default function DetallePeluqueria() {
                   )}
                   <button type="submit" disabled={loadingNueva}
                     className="mt-4 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50">
-                    {loadingNueva ? 'Generando...' : '⬇ Generar licencia para esta PC'}
+                    {loadingNueva ? 'Generando y enviando...' : '⬇ Generar y enviar por email'}
                   </button>
                 </form>
               )}

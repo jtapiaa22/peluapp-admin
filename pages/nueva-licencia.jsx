@@ -6,6 +6,14 @@ function fechaHoy() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+async function enviarEmail({ contacto, peluqueria, licBase64, nombreArchivo, vence }) {
+  await fetch('/api/enviar-licencia', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contacto, peluqueria, licBase64, nombreArchivo, vence }),
+  })
+}
+
 export default function NuevaLicencia() {
   const router = useRouter()
 
@@ -26,22 +34,39 @@ export default function NuevaLicencia() {
   async function generar(e) {
     e.preventDefault()
     setLoading(true); setMsg(null)
+
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form, esNuevoCliente: true }),
     })
     const data = await res.json()
-    setLoading(false)
-    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
 
+    if (!res.ok) {
+      setLoading(false)
+      return setMsg({ tipo: 'error', texto: data.error })
+    }
+
+    // Descargar localmente
     const blob = new Blob([data.licBase64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url; a.download = data.nombreArchivo; a.click()
     URL.revokeObjectURL(url)
 
-    setMsg({ tipo: 'ok', texto: '✅ Licencia generada y descargada' })
+    // Enviar por email
+    if (form.contacto) {
+      await enviarEmail({
+        contacto:      form.contacto,
+        peluqueria:    form.peluqueria,
+        licBase64:     data.licBase64,
+        nombreArchivo: data.nombreArchivo,
+        vence:         form.hasta,
+      })
+    }
+
+    setLoading(false)
+    setMsg({ tipo: 'ok', texto: '✅ Licencia generada, descargada y enviada por email' })
     setTimeout(() => router.push('/dashboard'), 1500)
   }
 
@@ -81,7 +106,7 @@ export default function NuevaLicencia() {
             <input className={inp} required value={form.contacto}
               placeholder="Ej: jofre@gmail.com"
               onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
-            <p className="text-xs text-zinc-600 mt-1">El email identifica al cliente. No puede repetirse.</p>
+            <p className="text-xs text-zinc-600 mt-1">El email identifica al cliente y recibe la licencia. No puede repetirse.</p>
           </div>
 
           <div>
@@ -130,7 +155,7 @@ export default function NuevaLicencia() {
 
           <button type="submit" disabled={loading}
             className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-violet-900/20">
-            {loading ? 'Generando...' : '⬇ Generar y descargar .lic'}
+            {loading ? 'Generando y enviando...' : '⬇ Generar y enviar licencia'}
           </button>
 
         </form>
