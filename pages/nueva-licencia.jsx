@@ -62,7 +62,7 @@ export default function NuevaLicencia() {
     } catch {
       setMsg({ tipo: 'error', texto: 'No se pudo conectar con el servidor.' })
     } finally {
-      setLoading(false)   // FIX: siempre se ejecuta, incluso si res.json() falla
+      setLoading(false)
     }
   }
 
