@@ -4,10 +4,17 @@ import { createClient } from '@supabase/supabase-js'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { peluqueria, contacto, machineId, desde, hasta, notas } = req.body
+  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas } = req.body
   if (!peluqueria || !machineId || !desde || !hasta)
     return res.status(400).json({ error: 'Faltan campos' })
 
+
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+
+  // Validar duplicado
   if (contacto) {
     const { data: existente } = await sb
       .from('licencias_vendidas')
@@ -17,8 +24,8 @@ export default async function handler(req, res) {
       .limit(1)
 
     if (existente?.length > 0) {
-      return res.status(400).json({ 
-        error: 'Esta máquina ya tiene una licencia registrada para ese cliente. Usá "Renovar" desde el detalle.' 
+      return res.status(400).json({
+        error: 'Esta máquina ya tiene una licencia registrada para ese cliente. Usá "Renovar" desde el detalle.'
       })
     }
   }
@@ -32,17 +39,11 @@ export default async function handler(req, res) {
   const datos = { app: 'peluapp', machineId, desde, vence: hasta, firma }
   const licBase64 = Buffer.from(JSON.stringify(datos)).toString('base64')
 
-  
-
-
-  const sb = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-
   const { error } = await sb.from('licencias_vendidas').insert({
     peluqueria, contacto: contacto || null,
-    machine_id: machineId, desde, vence: hasta,
+    machine_id: machineId,
+    nombre_maquina: nombreMaquina || null,
+    desde, vence: hasta,
     lic_base64: licBase64, notas: notas || null,
   })
 

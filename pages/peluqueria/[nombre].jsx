@@ -19,15 +19,25 @@ export default function DetallePeluqueria() {
   const router = useRouter()
   const { nombre } = router.query
 
-  const [licencias, setLicencias]               = useState([])
-  const [cargando, setCargando]                 = useState(true)
-  const [msg, setMsg]                           = useState(null)
-  const [loadingGen, setLoadingGen]             = useState(false)
-  const [mostrarForm, setMostrarForm]           = useState(false)
-  const [machineIdSeleccionado, setMachineIdSel] = useState(null)
-  const [copiadoId, setCopiadoId]               = useState(null)
+  const [licencias, setLicencias]                 = useState([])
+  const [cargando, setCargando]                   = useState(true)
+  const [copiadoId, setCopiadoId]                 = useState(null)
+
+  // Renovar máquina existente
+  const [mostrarForm, setMostrarForm]             = useState(false)
+  const [machineIdSeleccionado, setMachineIdSel]  = useState(null)
+  const [nombreMaqSeleccionada, setNombreMaqSel]  = useState(null)
+  const [msg, setMsg]                             = useState(null)
+  const [loadingGen, setLoadingGen]               = useState(false)
+
+  // Agregar nueva máquina
+  const [mostrarFormNueva, setMostrarFormNueva]   = useState(false)
+  const [msgNueva, setMsgNueva]                   = useState(null)
+  const [loadingNueva, setLoadingNueva]           = useState(false)
+
   const hoy = new Date().toISOString().split('T')[0]
-  const [form, setForm] = useState({ desde: hoy, hasta: '', notas: '' })
+  const [form, setForm]           = useState({ desde: hoy, hasta: '', notas: '' })
+  const [formNueva, setFormNueva] = useState({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
 
   useEffect(() => {
     if (!sessionStorage.getItem('admin_auth')) { router.push('/'); return }
@@ -72,12 +82,13 @@ export default function DetallePeluqueria() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        peluqueria: nombre,
-        contacto:   licencias[0]?.contacto || '',
-        machineId:  machineIdSeleccionado,
-        desde:      form.desde,
-        hasta:      form.hasta,
-        notas:      form.notas,
+        peluqueria:    nombre,
+        contacto:      licencias[0]?.contacto || '',
+        machineId:     machineIdSeleccionado,
+        nombreMaquina: nombreMaqSeleccionada,
+        desde:         form.desde,
+        hasta:         form.hasta,
+        notas:         form.notas,
       }),
     })
     const data = await res.json()
@@ -93,11 +104,43 @@ export default function DetallePeluqueria() {
     setMsg({ tipo: 'ok', texto: '✅ Licencia renovada y descargada' })
     setMostrarForm(false)
     setMachineIdSel(null)
+    setNombreMaqSel(null)
     setForm({ desde: hoy, hasta: '', notas: '' })
     cargarLicencias()
   }
 
-  // Agrupar licencias por machine_id
+  async function agregarMaquina(e) {
+    e.preventDefault()
+    setLoadingNueva(true); setMsgNueva(null)
+    const res = await fetch('/api/generar-licencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        peluqueria:    nombre,
+        contacto:      licencias[0]?.contacto || '',
+        machineId:     formNueva.machineId,
+        nombreMaquina: formNueva.nombreMaquina,
+        desde:         formNueva.desde,
+        hasta:         formNueva.hasta,
+        notas:         formNueva.notas,
+      }),
+    })
+    const data = await res.json()
+    setLoadingNueva(false)
+    if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
+
+    const blob = new Blob([data.licBase64], { type: 'text/plain' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = data.nombreArchivo; a.click()
+    URL.revokeObjectURL(url)
+
+    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada y .lic descargado' })
+    setMostrarFormNueva(false)
+    setFormNueva({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
+    cargarLicencias()
+  }
+
   const maquinas = Object.entries(
     licencias.reduce((acc, lic) => {
       if (!acc[lic.machine_id]) acc[lic.machine_id] = []
@@ -141,17 +184,20 @@ export default function DetallePeluqueria() {
               </div>
             </div>
 
-            {/* Form renovación */}
+            {/* Form renovar máquina existente */}
             {mostrarForm && (
               <form onSubmit={renovar} className="bg-zinc-900 border border-violet-500/20 rounded-2xl p-6 mb-6 fade-in">
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <h3 className="font-semibold text-violet-400">Renovar licencia</h3>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Máquina: <code className="text-violet-400">{machineIdSeleccionado?.substring(0, 20)}…</code>
+                      {nombreMaqSeleccionada
+                        ? <><span className="text-white">{nombreMaqSeleccionada}</span> · <code className="text-violet-400">{machineIdSeleccionado?.substring(0, 16)}…</code></>
+                        : <code className="text-violet-400">{machineIdSeleccionado?.substring(0, 20)}…</code>
+                      }
                     </p>
                   </div>
-                  <button type="button" onClick={() => { setMostrarForm(false); setMachineIdSel(null) }}
+                  <button type="button" onClick={() => { setMostrarForm(false); setMachineIdSel(null); setNombreMaqSel(null) }}
                     className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -181,7 +227,66 @@ export default function DetallePeluqueria() {
               </form>
             )}
 
-            {/* Máquinas */}
+            {/* Botón + form nueva máquina */}
+            <div className="mb-6">
+              {!mostrarFormNueva ? (
+                <button onClick={() => setMostrarFormNueva(true)}
+                  className="text-sm font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-500 px-4 py-2 rounded-xl transition-colors">
+                  + Agregar máquina
+                </button>
+              ) : (
+                <form onSubmit={agregarMaquina} className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 fade-in">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="font-semibold text-white">Nueva máquina</h3>
+                      <p className="text-xs text-zinc-500 mt-0.5">Cliente: {nombre} · {licencias[0]?.contacto}</p>
+                    </div>
+                    <button type="button" onClick={() => setMostrarFormNueva(false)}
+                      className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Nombre descriptivo de la PC</label>
+                      <input className={inp} value={formNueva.nombreMaquina}
+                        placeholder="Ej: PC Principal, Sucursal Centro, Notebook"
+                        onChange={e => setFormNueva(f => ({ ...f, nombreMaquina: e.target.value }))} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Machine ID *</label>
+                      <input className={inp} required value={formNueva.machineId}
+                        placeholder="ID que te mandó el cliente"
+                        onChange={e => setFormNueva(f => ({ ...f, machineId: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
+                      <input type="date" className={inp} required value={formNueva.desde}
+                        onChange={e => setFormNueva(f => ({ ...f, desde: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
+                      <input type="date" className={inp} required value={formNueva.hasta}
+                        onChange={e => setFormNueva(f => ({ ...f, hasta: e.target.value }))} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
+                      <input className={inp} value={formNueva.notas} placeholder="Ej: segunda sucursal, pagó $X"
+                        onChange={e => setFormNueva(f => ({ ...f, notas: e.target.value }))} />
+                    </div>
+                  </div>
+                  {msgNueva && (
+                    <p className={`mt-3 text-sm ${msgNueva.tipo === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+                      {msgNueva.texto}
+                    </p>
+                  )}
+                  <button type="submit" disabled={loadingNueva}
+                    className="mt-4 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50">
+                    {loadingNueva ? 'Generando...' : '⬇ Generar licencia para esta PC'}
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Máquinas registradas */}
             <h2 className="text-sm font-medium text-zinc-400 mb-3 uppercase tracking-wider">
               Máquinas registradas
             </h2>
@@ -195,7 +300,11 @@ export default function DetallePeluqueria() {
                     {/* Header máquina */}
                     <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
                       <div>
-                        <p className="text-xs text-zinc-500 mb-2">Máquina {i + 1}</p>
+                        <p className="text-xs text-zinc-500 mb-1">Máquina {i + 1}</p>
+                        {/* Nombre descriptivo */}
+                        <p className="text-white font-semibold text-base mb-2">
+                          {maq.ultima.nombre_maquina || <span className="text-zinc-500 font-normal italic">Sin nombre</span>}
+                        </p>
                         <div className="flex items-center gap-2">
                           <code className="text-violet-400 text-xs bg-violet-400/10 px-3 py-1.5 rounded-lg break-all">
                             {maq.machineId}
@@ -221,6 +330,7 @@ export default function DetallePeluqueria() {
                     {!mostrarForm && (
                       <button onClick={() => {
                         setMachineIdSel(maq.machineId)
+                        setNombreMaqSel(maq.ultima.nombre_maquina || null)
                         setMostrarForm(true)
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
@@ -229,7 +339,7 @@ export default function DetallePeluqueria() {
                       </button>
                     )}
 
-                    {/* Historial de esta máquina */}
+                    {/* Historial */}
                     <div className="space-y-2 mt-2">
                       {maq.licencias.map((lic, j) => {
                         const est = getEstado(lic.vence)
