@@ -6,14 +6,6 @@ function fechaHoy() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-async function enviarEmail({ contacto, peluqueria, licBase64, nombreArchivo, vence }) {
-  await fetch('/api/enviar-licencia', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contacto, peluqueria, licBase64, nombreArchivo, vence }),
-  })
-}
-
 export default function NuevaLicencia() {
   const router = useRouter()
 
@@ -26,14 +18,16 @@ export default function NuevaLicencia() {
     hasta:         '',
     notas:         '',
   })
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg]         = useState(null)
+  const [loading, setLoading]         = useState(false)
+  const [loadingEmail, setLoadingEmail] = useState(false)
+  const [msg, setMsg]                 = useState(null)
+  const [licGenerada, setLicGenerada] = useState(null) // { licBase64, nombreArchivo, vence }
 
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
   async function generar(e) {
     e.preventDefault()
-    setLoading(true); setMsg(null)
+    setLoading(true); setMsg(null); setLicGenerada(null)
 
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
@@ -41,33 +35,41 @@ export default function NuevaLicencia() {
       body: JSON.stringify({ ...form, esNuevoCliente: true }),
     })
     const data = await res.json()
+    setLoading(false)
 
-    if (!res.ok) {
-      setLoading(false)
-      return setMsg({ tipo: 'error', texto: data.error })
-    }
+    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
 
-    // Descargar localmente
-    const blob = new Blob([data.licBase64], { type: 'text/plain' })
+    setLicGenerada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
+    setMsg({ tipo: 'ok', texto: '✅ Licencia generada correctamente' })
+  }
+
+  function descargar() {
+    const blob = new Blob([licGenerada.licBase64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href = url; a.download = data.nombreArchivo; a.click()
+    a.href = url; a.download = licGenerada.nombreArchivo; a.click()
     URL.revokeObjectURL(url)
+  }
 
-    // Enviar por email
-    if (form.contacto) {
-      await enviarEmail({
+  async function enviarEmail() {
+    setLoadingEmail(true)
+    const res = await fetch('/api/enviar-licencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         contacto:      form.contacto,
         peluqueria:    form.peluqueria,
-        licBase64:     data.licBase64,
-        nombreArchivo: data.nombreArchivo,
-        vence:         form.hasta,
-      })
+        licBase64:     licGenerada.licBase64,
+        nombreArchivo: licGenerada.nombreArchivo,
+        vence:         licGenerada.vence,
+      }),
+    })
+    setLoadingEmail(false)
+    if (res.ok) {
+      setMsg({ tipo: 'ok', texto: `✅ Email enviado a ${form.contacto}` })
+    } else {
+      setMsg({ tipo: 'error', texto: 'Error al enviar el email' })
     }
-
-    setLoading(false)
-    setMsg({ tipo: 'ok', texto: '✅ Licencia generada, descargada y enviada por email' })
-    setTimeout(() => router.push('/dashboard'), 1500)
   }
 
   return (
@@ -143,6 +145,7 @@ export default function NuevaLicencia() {
               onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
           </div>
 
+          {/* Mensaje */}
           {msg && (
             <div className={`px-4 py-3 rounded-xl text-sm border ${
               msg.tipo === 'ok'
@@ -153,10 +156,32 @@ export default function NuevaLicencia() {
             </div>
           )}
 
-          <button type="submit" disabled={loading}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-violet-900/20">
-            {loading ? 'Generando y enviando...' : '⬇ Generar y enviar licencia'}
-          </button>
+          {/* Botones post-generación */}
+          {licGenerada ? (
+            <div className="flex gap-3">
+              <button type="button" onClick={descargar}
+                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-3 rounded-xl text-sm transition-colors">
+                ⬇ Descargar .lic
+              </button>
+              <button type="button" onClick={enviarEmail} disabled={loadingEmail || !form.contacto}
+                className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium py-3 rounded-xl text-sm transition-colors">
+                {loadingEmail ? 'Enviando...' : `✉ Enviar a ${form.contacto}`}
+              </button>
+            </div>
+          ) : (
+            <button type="submit" disabled={loading}
+              className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-violet-900/20">
+              {loading ? 'Generando...' : 'Generar licencia'}
+            </button>
+          )}
+
+          {/* Ir al dashboard luego de generar */}
+          {licGenerada && (
+            <button type="button" onClick={() => router.push('/dashboard')}
+              className="text-zinc-500 hover:text-white text-sm text-center transition-colors">
+              Ir al dashboard →
+            </button>
+          )}
 
         </form>
       </div>

@@ -20,12 +20,20 @@ function getEstado(vence) {
   return            { label: 'Activa',      text: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dias }
 }
 
-async function enviarEmail({ contacto, peluqueria, licBase64, nombreArchivo, vence }) {
-  await fetch('/api/enviar-licencia', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contacto, peluqueria, licBase64, nombreArchivo, vence }),
-  })
+// Componente de botones de acción post-generación
+function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, onEnviar }) {
+  return (
+    <div className="flex gap-3 mt-4">
+      <button type="button" onClick={onDescargar}
+        className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
+        ⬇ Descargar .lic
+      </button>
+      <button type="button" onClick={onEnviar} disabled={loadingEmail || !contacto}
+        className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
+        {loadingEmail ? 'Enviando...' : `✉ Enviar por email`}
+      </button>
+    </div>
+  )
 }
 
 export default function DetallePeluqueria() {
@@ -36,15 +44,21 @@ export default function DetallePeluqueria() {
   const [cargando, setCargando]                   = useState(true)
   const [copiadoId, setCopiadoId]                 = useState(null)
 
+  // Renovar
   const [mostrarForm, setMostrarForm]             = useState(false)
   const [machineIdSeleccionado, setMachineIdSel]  = useState(null)
   const [nombreMaqSeleccionada, setNombreMaqSel]  = useState(null)
   const [msg, setMsg]                             = useState(null)
   const [loadingGen, setLoadingGen]               = useState(false)
+  const [loadingEmailRen, setLoadingEmailRen]     = useState(false)
+  const [licRenovada, setLicRenovada]             = useState(null)
 
+  // Nueva máquina
   const [mostrarFormNueva, setMostrarFormNueva]   = useState(false)
   const [msgNueva, setMsgNueva]                   = useState(null)
   const [loadingNueva, setLoadingNueva]           = useState(false)
+  const [loadingEmailNueva, setLoadingEmailNueva] = useState(false)
+  const [licNueva, setLicNueva]                   = useState(null)
 
   const hoy = fechaHoy()
   const [form, setForm]           = useState({ desde: hoy, hasta: '', notas: '' })
@@ -76,7 +90,7 @@ export default function DetallePeluqueria() {
     setTimeout(() => setCopiadoId(null), 2000)
   }
 
-  function redownload(lic) {
+  function descargarLic(lic) {
     const blob = new Blob([lic.lic_base64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
@@ -86,10 +100,37 @@ export default function DetallePeluqueria() {
     URL.revokeObjectURL(url)
   }
 
+  function descargarGenerada(licData) {
+    const blob = new Blob([licData.licBase64], { type: 'text/plain' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = licData.nombreArchivo; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function enviarEmailLic(licData, setLoadingFn, setMsgFn) {
+    setLoadingFn(true)
+    const res = await fetch('/api/enviar-licencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contacto:      licencias[0]?.contacto,
+        peluqueria:    nombre,
+        licBase64:     licData.licBase64,
+        nombreArchivo: licData.nombreArchivo,
+        vence:         licData.vence,
+      }),
+    })
+    setLoadingFn(false)
+    setMsgFn({
+      tipo: res.ok ? 'ok' : 'error',
+      texto: res.ok ? `✅ Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email'
+    })
+  }
+
   async function renovar(e) {
     e.preventDefault()
-    setLoadingGen(true); setMsg(null)
-
+    setLoadingGen(true); setMsg(null); setLicRenovada(null)
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,43 +146,17 @@ export default function DetallePeluqueria() {
       }),
     })
     const data = await res.json()
-
-    if (!res.ok) {
-      setLoadingGen(false)
-      return setMsg({ tipo: 'error', texto: data.error })
-    }
-
-    // Descargar localmente
-    const blob = new Blob([data.licBase64], { type: 'text/plain' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = data.nombreArchivo; a.click()
-    URL.revokeObjectURL(url)
-
-    // Enviar por email
-    if (licencias[0]?.contacto) {
-      await enviarEmail({
-        contacto:      licencias[0].contacto,
-        peluqueria:    nombre,
-        licBase64:     data.licBase64,
-        nombreArchivo: data.nombreArchivo,
-        vence:         form.hasta,
-      })
-    }
-
     setLoadingGen(false)
-    setMsg({ tipo: 'ok', texto: '✅ Licencia renovada, descargada y enviada por email' })
-    setMostrarForm(false)
-    setMachineIdSel(null)
-    setNombreMaqSel(null)
-    setForm({ desde: hoy, hasta: '', notas: '' })
+    if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
+
+    setLicRenovada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
+    setMsg({ tipo: 'ok', texto: '✅ Licencia renovada correctamente' })
     cargarLicencias()
   }
 
   async function agregarMaquina(e) {
     e.preventDefault()
-    setLoadingNueva(true); setMsgNueva(null)
-
+    setLoadingNueva(true); setMsgNueva(null); setLicNueva(null)
     const res = await fetch('/api/generar-licencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,34 +172,11 @@ export default function DetallePeluqueria() {
       }),
     })
     const data = await res.json()
-
-    if (!res.ok) {
-      setLoadingNueva(false)
-      return setMsgNueva({ tipo: 'error', texto: data.error })
-    }
-
-    // Descargar localmente
-    const blob = new Blob([data.licBase64], { type: 'text/plain' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = data.nombreArchivo; a.click()
-    URL.revokeObjectURL(url)
-
-    // Enviar por email
-    if (licencias[0]?.contacto) {
-      await enviarEmail({
-        contacto:      licencias[0].contacto,
-        peluqueria:    nombre,
-        licBase64:     data.licBase64,
-        nombreArchivo: data.nombreArchivo,
-        vence:         formNueva.hasta,
-      })
-    }
-
     setLoadingNueva(false)
-    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada, .lic descargado y enviado por email' })
-    setMostrarFormNueva(false)
-    setFormNueva({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
+    if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
+
+    setLicNueva({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: formNueva.hasta })
+    setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada correctamente' })
     cargarLicencias()
   }
 
@@ -244,7 +236,7 @@ export default function DetallePeluqueria() {
                       }
                     </p>
                   </div>
-                  <button type="button" onClick={() => { setMostrarForm(false); setMachineIdSel(null); setNombreMaqSel(null) }}
+                  <button type="button" onClick={() => { setMostrarForm(false); setMachineIdSel(null); setNombreMaqSel(null); setLicRenovada(null); setMsg(null) }}
                     className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -264,13 +256,25 @@ export default function DetallePeluqueria() {
                       onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
                   </div>
                 </div>
+
                 {msg && (
                   <p className={`mt-3 text-sm ${msg.tipo === 'ok' ? 'text-green-400' : 'text-red-400'}`}>{msg.texto}</p>
                 )}
-                <button type="submit" disabled={loadingGen}
-                  className="mt-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors">
-                  {loadingGen ? 'Generando y enviando...' : '⬇ Renovar y enviar por email'}
-                </button>
+
+                {licRenovada ? (
+                  <AccionesLicencia
+                    licGenerada={licRenovada}
+                    contacto={licencias[0]?.contacto}
+                    loadingEmail={loadingEmailRen}
+                    onDescargar={() => descargarGenerada(licRenovada)}
+                    onEnviar={() => enviarEmailLic(licRenovada, setLoadingEmailRen, setMsg)}
+                  />
+                ) : (
+                  <button type="submit" disabled={loadingGen}
+                    className="mt-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors">
+                    {loadingGen ? 'Generando...' : 'Generar renovación'}
+                  </button>
+                )}
               </form>
             )}
 
@@ -288,7 +292,7 @@ export default function DetallePeluqueria() {
                       <h3 className="font-semibold text-white">Nueva máquina</h3>
                       <p className="text-xs text-zinc-500 mt-0.5">Cliente: {nombre} · {licencias[0]?.contacto}</p>
                     </div>
-                    <button type="button" onClick={() => setMostrarFormNueva(false)}
+                    <button type="button" onClick={() => { setMostrarFormNueva(false); setLicNueva(null); setMsgNueva(null) }}
                       className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -320,15 +324,27 @@ export default function DetallePeluqueria() {
                         onChange={e => setFormNueva(f => ({ ...f, notas: e.target.value }))} />
                     </div>
                   </div>
+
                   {msgNueva && (
                     <p className={`mt-3 text-sm ${msgNueva.tipo === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
                       {msgNueva.texto}
                     </p>
                   )}
-                  <button type="submit" disabled={loadingNueva}
-                    className="mt-4 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50">
-                    {loadingNueva ? 'Generando y enviando...' : '⬇ Generar y enviar por email'}
-                  </button>
+
+                  {licNueva ? (
+                    <AccionesLicencia
+                      licGenerada={licNueva}
+                      contacto={licencias[0]?.contacto}
+                      loadingEmail={loadingEmailNueva}
+                      onDescargar={() => descargarGenerada(licNueva)}
+                      onEnviar={() => enviarEmailLic(licNueva, setLoadingEmailNueva, setMsgNueva)}
+                    />
+                  ) : (
+                    <button type="submit" disabled={loadingNueva}
+                      className="mt-4 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50">
+                      {loadingNueva ? 'Generando...' : 'Generar licencia'}
+                    </button>
+                  )}
                 </form>
               )}
             </div>
@@ -376,6 +392,9 @@ export default function DetallePeluqueria() {
                         setMachineIdSel(maq.machineId)
                         setNombreMaqSel(maq.ultima.nombre_maquina || null)
                         setMostrarForm(true)
+                        setLicRenovada(null)
+                        setMsg(null)
+                        setForm({ desde: hoy, hasta: '', notas: '' })
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
                         className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-400/60 px-3 py-1.5 rounded-lg transition-colors mb-4">
@@ -400,7 +419,7 @@ export default function DetallePeluqueria() {
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${est.bg} ${est.border} ${est.text}`}>
                                 {est.label}
                               </span>
-                              <button onClick={() => redownload(lic)}
+                              <button onClick={() => descargarLic(lic)}
                                 className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors">
                                 ↓ .lic
                               </button>
