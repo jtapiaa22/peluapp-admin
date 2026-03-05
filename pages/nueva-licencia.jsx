@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
-
 function fechaHoy() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -21,20 +19,17 @@ const FORM_INICIAL = {
 }
 
 
-// ─── Página ───────────────────────────────────────────────────────────────────
-
 export default function NuevaLicencia() {
   const router = useRouter()
 
-  const [form, setForm]               = useState(FORM_INICIAL)
-  const [loading, setLoading]         = useState(false)
+  const [form, setForm]                 = useState(FORM_INICIAL)
+  const [loading, setLoading]           = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
-  const [msg, setMsg]                 = useState(null)
-  const [licGenerada, setLicGenerada] = useState(null)
+  const [msg, setMsg]                   = useState(null)
+  const [licGenerada, setLicGenerada]   = useState(null)
 
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
-  // FIX: auth guard
   useEffect(() => {
     if (!sessionStorage.getItem('admin_auth')) router.push('/')
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -42,18 +37,20 @@ export default function NuevaLicencia() {
   async function generar(e) {
     e.preventDefault()
 
-    // FIX: validación de fechas
     if (form.hasta && form.hasta < form.desde) {
       setMsg({ tipo: 'error', texto: 'La fecha de vencimiento debe ser posterior a la fecha de inicio.' })
       return
     }
 
     setMsg(null); setLicGenerada(null); setLoading(true)
-    try {   // FIX: try/catch/finally
-      const res  = await fetch('/api/generar-licencia', {
+    try {
+      const res = await fetch('/api/generar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...form, esNuevoCliente: true }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
+        body: JSON.stringify({ ...form, esNuevoCliente: true }),
       })
       const data = await res.json()
       if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
@@ -76,11 +73,14 @@ export default function NuevaLicencia() {
 
   async function enviarEmail() {
     setLoadingEmail(true)
-    try {   // FIX: try/catch/finally
+    try {
       const res = await fetch('/api/enviar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
+        body: JSON.stringify({
           contacto:      form.contacto,
           peluqueria:    form.peluqueria,
           licBase64:     licGenerada.licBase64,
@@ -100,7 +100,6 @@ export default function NuevaLicencia() {
     }
   }
 
-  // FIX: limpia todo para cargar otra licencia sin recargar la página
   function nuevaLicencia() {
     setForm(FORM_INICIAL)
     setLicGenerada(null)
@@ -110,7 +109,6 @@ export default function NuevaLicencia() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
 
-      {/* Header */}
       <div className="border-b border-zinc-800/60 bg-zinc-900/50 backdrop-blur sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
           <button onClick={() => router.push('/dashboard')}
@@ -168,17 +166,14 @@ export default function NuevaLicencia() {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
-              {/* FIX: min evita seleccionar una fecha anterior a "desde" directo desde el picker */}
               <input type="date" className={inp} required value={form.hasta} min={form.desde}
                 onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
             </div>
           </div>
 
-          {/* FIX: precio y notas en el mismo grid, sin duplicar notas */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
-              {/* FIX: min="0" para no permitir precios negativos */}
               <input type="number" min="0" className={inp} value={form.precio}
                 placeholder="Ej: 20000"
                 onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
@@ -191,7 +186,6 @@ export default function NuevaLicencia() {
             </div>
           </div>
 
-          {/* Mensaje */}
           {msg && (
             <div className={`px-4 py-3 rounded-xl text-sm border ${
               msg.tipo === 'ok'
@@ -202,7 +196,6 @@ export default function NuevaLicencia() {
             </div>
           )}
 
-          {/* Botones */}
           {licGenerada ? (
             <div className="flex gap-3">
               <button type="button" onClick={descargar}
@@ -221,7 +214,6 @@ export default function NuevaLicencia() {
             </button>
           )}
 
-          {/* FIX: acciones post-generación con opción de cargar otra */}
           {licGenerada && (
             <div className="flex items-center justify-between pt-1">
               <button type="button" onClick={nuevaLicencia}

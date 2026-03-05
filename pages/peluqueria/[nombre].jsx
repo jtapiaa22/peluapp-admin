@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 function fechaHoy() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -11,7 +9,7 @@ function fechaHoy() {
 
 function diasRestantes(vence) {
   const hoy = new Date(fechaHoy() + 'T00:00:00')
-  const fv  = new Date(vence    + 'T00:00:00')
+  const fv  = new Date(vence     + 'T00:00:00')
   return Math.round((fv - hoy) / (1000 * 60 * 60 * 24)) + 1
 }
 
@@ -22,10 +20,7 @@ function getEstado(vence) {
   return            { label: 'Activa',      text: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dias }
 }
 
-
-// ─── Sub-componente: botones de acción post-generación ───────────────────────
-
-function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, onEnviar }) {
+function AccionesLicencia({ contacto, loadingEmail, onDescargar, onEnviar }) {
   return (
     <div className="flex gap-3 mt-4">
       <button type="button" onClick={onDescargar}
@@ -40,62 +35,54 @@ function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, on
   )
 }
 
-
-// ─── Página principal ────────────────────────────────────────────────────────
-
-const FORM_INICIAL      = { desde: fechaHoy(), hasta: '', notas: '', precio: '' }
+const FORM_INICIAL       = { desde: fechaHoy(), hasta: '', notas: '', precio: '' }
 const FORM_NUEVA_INICIAL = { machineId: '', nombreMaquina: '', desde: fechaHoy(), hasta: '', notas: '', precio: '' }
 
+
 export default function DetallePeluqueria() {
-  const router            = useRouter()
-  const { nombre, isReady } = router   // FIX: isReady evita la race condition
+  const router              = useRouter()
+  const { nombre, isReady } = router
 
   const [licencias, setLicencias]   = useState([])
   const [cargando, setCargando]     = useState(true)
-  const [errorCarga, setErrorCarga] = useState(null)   // FIX: estado de error de red
+  const [errorCarga, setErrorCarga] = useState(null)
   const [copiadoId, setCopiadoId]   = useState(null)
 
   // Renovar
-  const [mostrarForm, setMostrarForm]           = useState(false)
+  const [mostrarForm, setMostrarForm]            = useState(false)
   const [machineIdSeleccionado, setMachineIdSel] = useState(null)
   const [nombreMaqSeleccionada, setNombreMaqSel] = useState(null)
-  const [msg, setMsg]                           = useState(null)
-  const [loadingGen, setLoadingGen]             = useState(false)
-  const [loadingEmailRen, setLoadingEmailRen]   = useState(false)
-  const [licRenovada, setLicRenovada]           = useState(null)
-  const [form, setForm]                         = useState(FORM_INICIAL)
+  const [msg, setMsg]                            = useState(null)
+  const [loadingGen, setLoadingGen]              = useState(false)
+  const [loadingEmailRen, setLoadingEmailRen]    = useState(false)
+  const [licRenovada, setLicRenovada]            = useState(null)
+  const [form, setForm]                          = useState(FORM_INICIAL)
 
   // Nueva máquina
-  const [mostrarFormNueva, setMostrarFormNueva]     = useState(false)
-  const [msgNueva, setMsgNueva]                     = useState(null)
-  const [loadingNueva, setLoadingNueva]             = useState(false)
-  const [loadingEmailNueva, setLoadingEmailNueva]   = useState(false)
-  const [licNueva, setLicNueva]                     = useState(null)
-  const [formNueva, setFormNueva]                   = useState(FORM_NUEVA_INICIAL)
+  const [mostrarFormNueva, setMostrarFormNueva]   = useState(false)
+  const [msgNueva, setMsgNueva]                   = useState(null)
+  const [loadingNueva, setLoadingNueva]           = useState(false)
+  const [loadingEmailNueva, setLoadingEmailNueva] = useState(false)
+  const [licNueva, setLicNueva]                   = useState(null)
+  const [formNueva, setFormNueva]                 = useState(FORM_NUEVA_INICIAL)
 
   // Email desde historial
   const [emailHistorial, setEmailHistorial] = useState({})
 
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
-
-  // ── Auth guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionStorage.getItem('admin_auth')) router.push('/')
-  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-
-  // ── Carga de licencias (FIX: espera isReady) ───────────────────────────────
   useEffect(() => {
     if (!isReady || !nombre) return
     cargarLicencias()
-  }, [isReady, nombre])   // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [isReady, nombre]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargarLicencias() {
-    setCargando(true)
-    setErrorCarga(null)
-    try {   // FIX: try/catch para errores de red
+    setCargando(true); setErrorCarga(null)
+    try {
       const auth = sessionStorage.getItem('admin_auth')
       const res  = await fetch(`/api/licencias?nombre=${encodeURIComponent(nombre)}`, {
         headers: { 'x-admin-auth': auth },
@@ -103,16 +90,12 @@ export default function DetallePeluqueria() {
       if (res.status === 401) { sessionStorage.clear(); router.push('/'); return }
       const data = await res.json()
       setLicencias(data || [])
-    } catch (err) {
-      console.error('Error al cargar licencias:', err)
+    } catch {
       setErrorCarga('No se pudo conectar con el servidor. Revisá tu conexión.')
     } finally {
       setCargando(false)
     }
   }
-
-
-  // ── Helpers UI ─────────────────────────────────────────────────────────────
 
   function copiar(machineId) {
     navigator.clipboard.writeText(machineId)
@@ -124,10 +107,9 @@ export default function DetallePeluqueria() {
     const blob = new Blob([lic.lic_base64], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href     = url
+    a.href = url
     a.download = `licencia-${lic.peluqueria.replace(/\s+/g, '-')}-${lic.vence}.lic`
-    a.click()
-    URL.revokeObjectURL(url)
+    a.click(); URL.revokeObjectURL(url)
   }
 
   function descargarGenerada(licData) {
@@ -138,15 +120,15 @@ export default function DetallePeluqueria() {
     URL.revokeObjectURL(url)
   }
 
-
-  // ── Email ──────────────────────────────────────────────────────────────────
-
   async function enviarEmailLic(licData, setLoadingFn, setMsgFn) {
     setLoadingFn(true)
-    try {   // FIX: try/catch
+    try {
       const res = await fetch('/api/enviar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
         body: JSON.stringify({
           contacto:      licencias[0]?.contacto,
           peluqueria:    nombre,
@@ -170,10 +152,13 @@ export default function DetallePeluqueria() {
 
   async function enviarEmailHistorial(lic) {
     setEmailHistorial(prev => ({ ...prev, [lic.id]: 'loading' }))
-    try {   // FIX: try/catch
+    try {
       const res = await fetch('/api/enviar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
         body: JSON.stringify({
           contacto:      licencias[0]?.contacto,
           peluqueria:    nombre,
@@ -190,25 +175,25 @@ export default function DetallePeluqueria() {
     }
   }
 
-
-  // ── Formularios ────────────────────────────────────────────────────────────
-
   async function renovar(e) {
     e.preventDefault()
     setLoadingGen(true); setMsg(null); setLicRenovada(null)
-    try {   // FIX: try/catch
-      const res  = await fetch('/api/generar-licencia', {
+    try {
+      const res = await fetch('/api/generar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
         body: JSON.stringify({
-          peluqueria:    nombre,
-          contacto:      licencias[0]?.contacto || '',
-          machineId:     machineIdSeleccionado,
-          nombreMaquina: nombreMaqSeleccionada,
-          desde:         form.desde,
-          hasta:         form.hasta,
-          notas:         form.notas,
-          precio:        form.precio,
+          peluqueria:     nombre,
+          contacto:       licencias[0]?.contacto || '',
+          machineId:      machineIdSeleccionado,
+          nombreMaquina:  nombreMaqSeleccionada,
+          desde:          form.desde,
+          hasta:          form.hasta,
+          notas:          form.notas,
+          precio:         form.precio,
           esNuevoCliente: false,
           esRenovacion:   true,
         }),
@@ -228,19 +213,22 @@ export default function DetallePeluqueria() {
   async function agregarMaquina(e) {
     e.preventDefault()
     setLoadingNueva(true); setMsgNueva(null); setLicNueva(null)
-    try {   // FIX: try/catch
-      const res  = await fetch('/api/generar-licencia', {
+    try {
+      const res = await fetch('/api/generar-licencia', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+        },
         body: JSON.stringify({
-          peluqueria:    nombre,
-          contacto:      licencias[0]?.contacto || '',
-          machineId:     formNueva.machineId,
-          nombreMaquina: formNueva.nombreMaquina,
-          desde:         formNueva.desde,
-          hasta:         formNueva.hasta,
-          notas:         formNueva.notas,
-          precio:        formNueva.precio,
+          peluqueria:     nombre,
+          contacto:       licencias[0]?.contacto || '',
+          machineId:      formNueva.machineId,
+          nombreMaquina:  formNueva.nombreMaquina,
+          desde:          formNueva.desde,
+          hasta:          formNueva.hasta,
+          notas:          formNueva.notas,
+          precio:         formNueva.precio,
           esNuevoCliente: false,
           esRenovacion:   false,
         }),
@@ -257,10 +245,6 @@ export default function DetallePeluqueria() {
     }
   }
 
-
-  // ── Derivados ──────────────────────────────────────────────────────────────
-
-  // FIX: ordenar licencias de cada máquina por fecha descendente → lics[0] siempre es la más reciente
   const maquinas = Object.entries(
     licencias.reduce((acc, lic) => {
       if (!acc[lic.machine_id]) acc[lic.machine_id] = []
@@ -272,13 +256,9 @@ export default function DetallePeluqueria() {
     return { machineId, licencias: ordenadas, ultima: ordenadas[0] }
   })
 
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
 
-      {/* Header */}
       <div className="border-b border-zinc-800/60 bg-zinc-900/50 backdrop-blur sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <button onClick={() => router.push('/dashboard')}
@@ -292,13 +272,10 @@ export default function DetallePeluqueria() {
 
       <div className="max-w-4xl mx-auto px-6 py-8 fade-in">
 
-        {/* FIX: estado de error de red */}
         {errorCarga && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-6">
-            {errorCarga}
-            <button onClick={cargarLicencias} className="ml-3 underline hover:no-underline">
-              Reintentar
-            </button>
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-6 flex items-center justify-between">
+            <span>{errorCarga}</span>
+            <button onClick={cargarLicencias} className="underline hover:no-underline ml-4">Reintentar</button>
           </div>
         )}
 
@@ -333,7 +310,6 @@ export default function DetallePeluqueria() {
                     setNombreMaqSel(null); setLicRenovada(null); setMsg(null)
                   }} className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
@@ -342,18 +318,17 @@ export default function DetallePeluqueria() {
                   </div>
                   <div>
                     <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
-                    <input type="date" className={inp} required value={form.hasta}
+                    <input type="date" className={inp} required value={form.hasta} min={form.desde}
                       onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
                   </div>
-                  {/* FIX: campo precio agregado */}
-                  <div className="col-span-2">
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Precio</label>
-                    <input className={inp} value={form.precio} placeholder="Ej: 5000"
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
+                    <input type="number" min="0" className={inp} value={form.precio} placeholder="Ej: 20000"
                       onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
-                    <input className={inp} value={form.notas} placeholder="Ej: renovación 3 meses, pagó $X"
+                    <input className={inp} value={form.notas} placeholder="Ej: renovación 3 meses"
                       onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
                   </div>
                 </div>
@@ -364,7 +339,6 @@ export default function DetallePeluqueria() {
 
                 {licRenovada ? (
                   <AccionesLicencia
-                    licGenerada={licRenovada}
                     contacto={licencias[0]?.contacto}
                     loadingEmail={loadingEmailRen}
                     onDescargar={() => descargarGenerada(licRenovada)}
@@ -396,7 +370,6 @@ export default function DetallePeluqueria() {
                     <button type="button" onClick={() => { setMostrarFormNueva(false); setLicNueva(null); setMsgNueva(null) }}
                       className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="text-xs text-zinc-400 mb-1.5 block">Nombre descriptivo de la PC</label>
@@ -417,18 +390,17 @@ export default function DetallePeluqueria() {
                     </div>
                     <div>
                       <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
-                      <input type="date" className={inp} required value={formNueva.hasta}
+                      <input type="date" className={inp} required value={formNueva.hasta} min={formNueva.desde}
                         onChange={e => setFormNueva(f => ({ ...f, hasta: e.target.value }))} />
                     </div>
-                    {/* FIX: campo precio agregado */}
-                    <div className="col-span-2">
-                      <label className="text-xs text-zinc-400 mb-1.5 block">Precio</label>
-                      <input className={inp} value={formNueva.precio} placeholder="Ej: 5000"
+                    <div>
+                      <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
+                      <input type="number" min="0" className={inp} value={formNueva.precio} placeholder="Ej: 20000"
                         onChange={e => setFormNueva(f => ({ ...f, precio: e.target.value }))} />
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
-                      <input className={inp} value={formNueva.notas} placeholder="Ej: segunda sucursal, pagó $X"
+                      <input className={inp} value={formNueva.notas} placeholder="Ej: segunda sucursal"
                         onChange={e => setFormNueva(f => ({ ...f, notas: e.target.value }))} />
                     </div>
                   </div>
@@ -441,7 +413,6 @@ export default function DetallePeluqueria() {
 
                   {licNueva ? (
                     <AccionesLicencia
-                      licGenerada={licNueva}
                       contacto={licencias[0]?.contacto}
                       loadingEmail={loadingEmailNueva}
                       onDescargar={() => descargarGenerada(licNueva)}
@@ -462,7 +433,6 @@ export default function DetallePeluqueria() {
               Máquinas registradas
             </h2>
 
-            {/* FIX: estado vacío */}
             {maquinas.length === 0 ? (
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-600 text-sm">
                 No hay máquinas registradas para este cliente.
@@ -516,7 +486,6 @@ export default function DetallePeluqueria() {
                         </button>
                       )}
 
-                      {/* Historial */}
                       <div className="space-y-2 mt-2">
                         {maq.licencias.map((lic, j) => {
                           const est        = getEstado(lic.vence)
