@@ -76,9 +76,9 @@ export default function DetallePeluqueria() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!isReady || !nombre) return
+    if (!nombre) return
     cargarLicencias()
-  }, [isReady, nombre]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nombre])
 
   async function cargarLicencias() {
     setCargando(true); setErrorCarga(null)
