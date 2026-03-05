@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../../lib/supabase'
 
+function fechaHoy() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 function diasRestantes(vence) {
-  const hoy = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00Z')
-  const fv  = new Date(vence + 'T00:00:00Z')
+  const hoy = new Date(fechaHoy() + 'T00:00:00')
+  const fv  = new Date(vence + 'T00:00:00')
   return Math.round((fv - hoy) / (1000 * 60 * 60 * 24)) + 1
 }
 
@@ -23,19 +28,17 @@ export default function DetallePeluqueria() {
   const [cargando, setCargando]                   = useState(true)
   const [copiadoId, setCopiadoId]                 = useState(null)
 
-  // Renovar máquina existente
   const [mostrarForm, setMostrarForm]             = useState(false)
   const [machineIdSeleccionado, setMachineIdSel]  = useState(null)
   const [nombreMaqSeleccionada, setNombreMaqSel]  = useState(null)
   const [msg, setMsg]                             = useState(null)
   const [loadingGen, setLoadingGen]               = useState(false)
 
-  // Agregar nueva máquina
   const [mostrarFormNueva, setMostrarFormNueva]   = useState(false)
   const [msgNueva, setMsgNueva]                   = useState(null)
   const [loadingNueva, setLoadingNueva]           = useState(false)
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = fechaHoy()
   const [form, setForm]           = useState({ desde: hoy, hasta: '', notas: '' })
   const [formNueva, setFormNueva] = useState({ machineId: '', nombreMaquina: '', desde: hoy, hasta: '', notas: '' })
 
@@ -124,7 +127,7 @@ export default function DetallePeluqueria() {
         desde:          formNueva.desde,
         hasta:          formNueva.hasta,
         notas:          formNueva.notas,
-        esNuevoCliente: false,  // ← clave: no valida duplicado de contacto
+        esNuevoCliente: false,
       }),
     })
     const data = await res.json()
@@ -186,7 +189,7 @@ export default function DetallePeluqueria() {
               </div>
             </div>
 
-            {/* Form renovar máquina existente */}
+            {/* Form renovar */}
             {mostrarForm && (
               <form onSubmit={renovar} className="bg-zinc-900 border border-violet-500/20 rounded-2xl p-6 mb-6 fade-in">
                 <div className="flex items-center justify-between mb-5">
@@ -288,7 +291,7 @@ export default function DetallePeluqueria() {
               )}
             </div>
 
-            {/* Máquinas registradas */}
+            {/* Máquinas */}
             <h2 className="text-sm font-medium text-zinc-400 mb-3 uppercase tracking-wider">
               Máquinas registradas
             </h2>
@@ -326,7 +329,6 @@ export default function DetallePeluqueria() {
                       </div>
                     </div>
 
-                    {/* Botón renovar */}
                     {!mostrarForm && (
                       <button onClick={() => {
                         setMachineIdSel(maq.machineId)
@@ -339,7 +341,6 @@ export default function DetallePeluqueria() {
                       </button>
                     )}
 
-                    {/* Historial */}
                     <div className="space-y-2 mt-2">
                       {maq.licencias.map((lic, j) => {
                         const est = getEstado(lic.vence)

@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 
+function fechaHoy() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 export default function NuevaLicencia() {
   const router = useRouter()
 
@@ -9,7 +14,7 @@ export default function NuevaLicencia() {
     contacto:      '',
     machineId:     '',
     nombreMaquina: '',
-    desde:         new Date().toISOString().split('T')[0],
+    desde:         fechaHoy(),
     hasta:         '',
     notas:         '',
   })
@@ -64,7 +69,6 @@ export default function NuevaLicencia() {
 
         <form onSubmit={generar} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col gap-5">
 
-          {/* Peluquería */}
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la peluquería *</label>
             <input className={inp} required value={form.peluqueria}
@@ -72,16 +76,14 @@ export default function NuevaLicencia() {
               onChange={e => setForm(f => ({ ...f, peluqueria: e.target.value }))} />
           </div>
 
-          {/* Contacto */}
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Contacto / Email *</label>
             <input className={inp} required value={form.contacto}
               placeholder="Ej: jofre@gmail.com"
               onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
-            <p className="text-xs text-zinc-600 mt-1">El email se usa para identificar al cliente. No puede repetirse.</p>
+            <p className="text-xs text-zinc-600 mt-1">El email identifica al cliente. No puede repetirse.</p>
           </div>
 
-          {/* Nombre máquina */}
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Nombre descriptivo de la PC</label>
             <input className={inp} value={form.nombreMaquina}
@@ -89,7 +91,6 @@ export default function NuevaLicencia() {
               onChange={e => setForm(f => ({ ...f, nombreMaquina: e.target.value }))} />
           </div>
 
-          {/* Machine ID */}
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Machine ID *</label>
             <input className={inp} required value={form.machineId}
@@ -97,7 +98,6 @@ export default function NuevaLicencia() {
               onChange={e => setForm(f => ({ ...f, machineId: e.target.value }))} />
           </div>
 
-          {/* Fechas */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
@@ -111,7 +111,6 @@ export default function NuevaLicencia() {
             </div>
           </div>
 
-          {/* Notas */}
           <div>
             <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
             <input className={inp} value={form.notas}
@@ -119,7 +118,6 @@ export default function NuevaLicencia() {
               onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
           </div>
 
-          {/* Mensaje */}
           {msg && (
             <div className={`px-4 py-3 rounded-xl text-sm border ${
               msg.tipo === 'ok'
@@ -130,7 +128,6 @@ export default function NuevaLicencia() {
             </div>
           )}
 
-          {/* Botón */}
           <button type="submit" disabled={loading}
             className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-violet-900/20">
             {loading ? 'Generando...' : '⬇ Generar y descargar .lic'}

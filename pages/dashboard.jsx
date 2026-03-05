@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 
+function fechaHoy() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 function diasRestantes(vence) {
-  const hoy = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00Z')
-  const fv  = new Date(vence + 'T00:00:00Z')
+  const hoy = new Date(fechaHoy() + 'T00:00:00')
+  const fv  = new Date(vence + 'T00:00:00')
   return Math.round((fv - hoy) / (1000 * 60 * 60 * 24)) + 1
 }
 
@@ -19,7 +24,6 @@ export default function Dashboard() {
   const router = useRouter()
   const [historial, setHistorial] = useState([])
   const [cargando, setCargando]   = useState(true)
-  const hoy = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     if (!sessionStorage.getItem('admin_auth')) { router.push('/'); return }
