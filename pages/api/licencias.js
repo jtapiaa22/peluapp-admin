@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// service_role bypasea RLS — NUNCA exponer esto al browser
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -9,7 +8,6 @@ function getSupabase() {
 }
 
 export default async function handler(req, res) {
-  // Verificar que sea el admin (misma lógica que login.js)
   const auth = req.headers['x-admin-auth']
   if (auth !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'No autorizado' })
@@ -17,19 +15,59 @@ export default async function handler(req, res) {
 
   const sb = getSupabase()
 
+  // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     const { nombre } = req.query
-
-    let query = sb
-      .from('licencias_vendidas')
-      .select('*')
-      .order('creada_en', { ascending: false })
-
+    let query = sb.from('licencias_vendidas').select('*').order('creada_en', { ascending: false })
     if (nombre) query = query.eq('peluqueria', nombre)
-
     const { data, error } = await query
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
+  }
+
+  // ── DELETE ───────────────────────────────────────────────────────────────
+  // ?id=X          → elimina una licencia individual
+  // ?peluqueria=X  → elimina TODAS las licencias del cliente
+  if (req.method === 'DELETE') {
+    const { id, peluqueria } = req.query
+
+    if (id) {
+      const { error } = await sb.from('licencias_vendidas').delete().eq('id', id)
+      if (error) return res.status(500).json({ error: error.message })
+      return res.status(200).json({ ok: true })
+    }
+
+    if (peluqueria) {
+      const { error } = await sb.from('licencias_vendidas').delete().eq('peluqueria', peluqueria)
+      if (error) return res.status(500).json({ error: error.message })
+      return res.status(200).json({ ok: true })
+    }
+
+    return res.status(400).json({ error: 'Falta id o peluqueria' })
+  }
+
+  // ── PUT ──────────────────────────────────────────────────────────────────
+  // body: { peluqueriaActual, peluqueriaNueva?, contacto? }
+  if (req.method === 'PUT') {
+    const { peluqueriaActual, peluqueriaNueva, contacto } = req.body
+    if (!peluqueriaActual) return res.status(400).json({ error: 'Falta peluqueriaActual' })
+
+    const updates = {}
+    if (peluqueriaNueva && peluqueriaNueva.trim() !== peluqueriaActual)
+      updates.peluqueria = peluqueriaNueva.trim()
+    if (contacto !== undefined)
+      updates.contacto = contacto.trim() || null
+
+    if (!Object.keys(updates).length)
+      return res.status(200).json({ ok: true, peluqueriaNueva: peluqueriaActual })
+
+    const { error } = await sb
+      .from('licencias_vendidas')
+      .update(updates)
+      .eq('peluqueria', peluqueriaActual)
+
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ ok: true, peluqueriaNueva: updates.peluqueria || peluqueriaActual })
   }
 
   return res.status(405).end()
