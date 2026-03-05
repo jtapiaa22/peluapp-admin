@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '../lib/supabase'
 
 function fechaHoy() {
   const d = new Date()
@@ -24,20 +23,34 @@ export default function Dashboard() {
   const router = useRouter()
   const [historial, setHistorial] = useState([])
   const [cargando, setCargando]   = useState(true)
+  const [error, setError]         = useState(null)
 
   useEffect(() => {
-    if (!sessionStorage.getItem('admin_auth')) { router.push('/'); return }
-    cargarHistorial()
+    const auth = sessionStorage.getItem('admin_auth')
+    if (!auth) { router.push('/'); return }
+    cargarHistorial(auth)
   }, [])
 
-  async function cargarHistorial() {
+  async function cargarHistorial(auth) {
     setCargando(true)
-    const { data } = await supabase
-      .from('licencias_vendidas')
-      .select('*')
-      .order('creada_en', { ascending: false })
-    setHistorial(data || [])
-    setCargando(false)
+    setError(null)
+    try {
+      const res = await fetch('/api/licencias', {
+        headers: { 'x-admin-auth': auth }
+      })
+      if (res.status === 401) {
+        sessionStorage.clear()
+        router.push('/')
+        return
+      }
+      if (!res.ok) throw new Error('Error al cargar licencias')
+      const data = await res.json()
+      setHistorial(data || [])
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setCargando(false)
+    }
   }
 
   const peluquerias = Object.entries(
@@ -110,6 +123,10 @@ export default function Dashboard() {
 
         {cargando ? (
           <div className="text-zinc-600 text-sm">Cargando...</div>
+        ) : error ? (
+          <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+            Error: {error}
+          </div>
         ) : peluquerias.length === 0 ? (
           <div className="text-center py-20 text-zinc-600">
             <div className="text-4xl mb-3">📋</div>
