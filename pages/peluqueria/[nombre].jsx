@@ -20,7 +20,6 @@ function getEstado(vence) {
   return            { label: 'Activa',      text: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dias }
 }
 
-// Componente de botones de acción post-generación
 function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, onEnviar }) {
   return (
     <div className="flex gap-3 mt-4">
@@ -30,7 +29,7 @@ function AccionesLicencia({ licGenerada, contacto, loadingEmail, onDescargar, on
       </button>
       <button type="button" onClick={onEnviar} disabled={loadingEmail || !contacto}
         className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
-        {loadingEmail ? 'Enviando...' : `✉ Enviar por email`}
+        {loadingEmail ? 'Enviando...' : '✉ Enviar por email'}
       </button>
     </div>
   )
@@ -59,6 +58,9 @@ export default function DetallePeluqueria() {
   const [loadingNueva, setLoadingNueva]           = useState(false)
   const [loadingEmailNueva, setLoadingEmailNueva] = useState(false)
   const [licNueva, setLicNueva]                   = useState(null)
+
+  // Email desde historial — guarda { licId, loading }
+  const [emailHistorial, setEmailHistorial]       = useState({})
 
   const hoy = fechaHoy()
   const [form, setForm]           = useState({ desde: hoy, hasta: '', notas: '' })
@@ -123,9 +125,27 @@ export default function DetallePeluqueria() {
     })
     setLoadingFn(false)
     setMsgFn({
-      tipo: res.ok ? 'ok' : 'error',
-      texto: res.ok ? `✅ Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email'
+      tipo:  res.ok ? 'ok' : 'error',
+      texto: res.ok ? `✅ Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email',
     })
+  }
+
+  // Enviar email directo desde una fila del historial
+  async function enviarEmailHistorial(lic) {
+    setEmailHistorial(prev => ({ ...prev, [lic.id]: 'loading' }))
+    const res = await fetch('/api/enviar-licencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contacto:      licencias[0]?.contacto,
+        peluqueria:    nombre,
+        licBase64:     lic.lic_base64,
+        nombreArchivo: `licencia-${nombre.replace(/\s+/g, '-')}-${lic.vence}.lic`,
+        vence:         lic.vence,
+      }),
+    })
+    setEmailHistorial(prev => ({ ...prev, [lic.id]: res.ok ? 'ok' : 'error' }))
+    setTimeout(() => setEmailHistorial(prev => ({ ...prev, [lic.id]: null })), 3000)
   }
 
   async function renovar(e) {
@@ -143,6 +163,7 @@ export default function DetallePeluqueria() {
         hasta:          form.hasta,
         notas:          form.notas,
         esNuevoCliente: false,
+        esRenovacion:   true,     // ← sin validación de duplicado
       }),
     })
     const data = await res.json()
@@ -169,6 +190,7 @@ export default function DetallePeluqueria() {
         hasta:          formNueva.hasta,
         notas:          formNueva.notas,
         esNuevoCliente: false,
+        esRenovacion:   false,
       }),
     })
     const data = await res.json()
@@ -236,8 +258,10 @@ export default function DetallePeluqueria() {
                       }
                     </p>
                   </div>
-                  <button type="button" onClick={() => { setMostrarForm(false); setMachineIdSel(null); setNombreMaqSel(null); setLicRenovada(null); setMsg(null) }}
-                    className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
+                  <button type="button" onClick={() => {
+                    setMostrarForm(false); setMachineIdSel(null)
+                    setNombreMaqSel(null); setLicRenovada(null); setMsg(null)
+                  }} className="text-zinc-600 hover:text-white text-sm transition-colors">✕ Cancelar</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -402,9 +426,11 @@ export default function DetallePeluqueria() {
                       </button>
                     )}
 
+                    {/* Historial */}
                     <div className="space-y-2 mt-2">
                       {maq.licencias.map((lic, j) => {
-                        const est = getEstado(lic.vence)
+                        const est        = getEstado(lic.vence)
+                        const emailState = emailHistorial[lic.id]
                         return (
                           <div key={lic.id}
                             className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-2.5 gap-4 flex-wrap">
@@ -419,10 +445,22 @@ export default function DetallePeluqueria() {
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${est.bg} ${est.border} ${est.text}`}>
                                 {est.label}
                               </span>
+                              {/* Descargar */}
                               <button onClick={() => descargarLic(lic)}
                                 className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-2.5 py-1.5 rounded-lg transition-colors">
-                                ↓ .lic
+                                ⬇ .lic
                               </button>
+                              {/* Enviar por email */}
+                              {licencias[0]?.contacto && (
+                                <button onClick={() => enviarEmailHistorial(lic)}
+                                  disabled={emailState === 'loading'}
+                                  className="text-xs text-violet-400 hover:text-violet-300 disabled:opacity-50 border border-violet-400/30 hover:border-violet-400/60 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                                  {emailState === 'loading' ? '...'
+                                    : emailState === 'ok'    ? '✓ Enviado'
+                                    : emailState === 'error' ? '✗ Error'
+                                    : '✉'}
+                                </button>
+                              )}
                             </div>
                           </div>
                         )

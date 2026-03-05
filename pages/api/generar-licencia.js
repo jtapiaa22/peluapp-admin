@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas, esNuevoCliente } = req.body
+  const { peluqueria, contacto, machineId, nombreMaquina, desde, hasta, notas, esNuevoCliente, esRenovacion } = req.body
 
   if (!peluqueria || !machineId || !desde || !hasta)
     return res.status(400).json({ error: 'Faltan campos obligatorios' })
@@ -14,8 +14,9 @@ export default async function handler(req, res) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  // Validación según origen
-  if (esNuevoCliente && contacto) {
+  if (esRenovacion) {
+    // Renovar: sin ninguna validación, siempre permitido
+  } else if (esNuevoCliente && contacto) {
     // Desde "Nueva licencia": el contacto no puede existir en absoluto
     const { data: existente } = await sb
       .from('licencias_vendidas')
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
       })
     }
   } else if (!esNuevoCliente && contacto) {
-    // Desde "Agregar máquina": solo bloquear si esa máquina puntual ya está registrada
+    // Agregar nueva máquina: bloquear si esa máquina puntual ya existe
     const { data: existente } = await sb
       .from('licencias_vendidas')
       .select('id')
@@ -43,7 +44,6 @@ export default async function handler(req, res) {
       })
     }
   }
-  // Renovar: sin validación de duplicado, siempre permitido
 
   const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY
   const firma = crypto
@@ -51,18 +51,18 @@ export default async function handler(req, res) {
     .update(`peluapp|${machineId}|${desde}|${hasta}`)
     .digest('hex')
 
-  const datos    = { app: 'peluapp', machineId, desde, vence: hasta, firma }
+  const datos     = { app: 'peluapp', machineId, desde, vence: hasta, firma }
   const licBase64 = Buffer.from(JSON.stringify(datos)).toString('base64')
 
   const { error } = await sb.from('licencias_vendidas').insert({
     peluqueria,
-    contacto:       contacto       || null,
+    contacto:       contacto      || null,
     machine_id:     machineId,
-    nombre_maquina: nombreMaquina  || null,
+    nombre_maquina: nombreMaquina || null,
     desde,
     vence:          hasta,
     lic_base64:     licBase64,
-    notas:          notas          || null,
+    notas:          notas         || null,
   })
 
   if (error) return res.status(500).json({ error: error.message })
