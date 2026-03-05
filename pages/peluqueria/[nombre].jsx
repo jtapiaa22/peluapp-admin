@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '../../lib/supabase'
 
 function fechaHoy() {
   const d = new Date()
@@ -77,11 +76,12 @@ export default function DetallePeluqueria() {
 
   async function cargarLicencias() {
     setCargando(true)
-    const { data } = await supabase
-      .from('licencias_vendidas')
-      .select('*')
-      .eq('peluqueria', nombre)
-      .order('creada_en', { ascending: false })
+    const auth = sessionStorage.getItem('admin_auth')
+    const res = await fetch(`/api/licencias?nombre=${encodeURIComponent(nombre)}`, {
+      headers: { 'x-admin-auth': auth }
+    })
+    if (res.status === 401) { sessionStorage.clear(); router.push('/'); return }
+    const data = await res.json()
     setLicencias(data || [])
     setCargando(false)
   }
