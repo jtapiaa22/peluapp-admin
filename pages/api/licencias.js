@@ -38,6 +38,8 @@ export default async function handler(req, res) {
     }
 
     if (peluqueria) {
+      // También borrar pagos del cliente al eliminar
+      await sb.from('pagos').delete().eq('peluqueria', peluqueria)
       const { error } = await sb.from('licencias_vendidas').delete().eq('peluqueria', peluqueria)
       if (error) return res.status(500).json({ error: error.message })
       return res.status(200).json({ ok: true })
@@ -47,9 +49,9 @@ export default async function handler(req, res) {
   }
 
   // ── PUT ──────────────────────────────────────────────────────────────────
-  // body: { peluqueriaActual, peluqueriaNueva?, contacto? }
+  // body: { peluqueriaActual, peluqueriaNueva?, contacto?, telefono? }
   if (req.method === 'PUT') {
-    const { peluqueriaActual, peluqueriaNueva, contacto } = req.body
+    const { peluqueriaActual, peluqueriaNueva, contacto, telefono } = req.body
     if (!peluqueriaActual) return res.status(400).json({ error: 'Falta peluqueriaActual' })
 
     const updates = {}
@@ -57,6 +59,8 @@ export default async function handler(req, res) {
       updates.peluqueria = peluqueriaNueva.trim()
     if (contacto !== undefined)
       updates.contacto = contacto.trim() || null
+    if (telefono !== undefined)
+      updates.telefono = telefono.trim() || null
 
     if (!Object.keys(updates).length)
       return res.status(200).json({ ok: true, peluqueriaNueva: peluqueriaActual })
@@ -67,6 +71,15 @@ export default async function handler(req, res) {
       .eq('peluqueria', peluqueriaActual)
 
     if (error) return res.status(500).json({ error: error.message })
+
+    // Si cambió el nombre, también actualizar en la tabla de pagos
+    if (updates.peluqueria) {
+      await sb
+        .from('pagos')
+        .update({ peluqueria: updates.peluqueria })
+        .eq('peluqueria', peluqueriaActual)
+    }
+
     return res.status(200).json({ ok: true, peluqueriaNueva: updates.peluqueria || peluqueriaActual })
   }
 

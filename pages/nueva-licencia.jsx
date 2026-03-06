@@ -10,6 +10,7 @@ function fechaHoy() {
 const FORM_INICIAL = {
   peluqueria:    '',
   contacto:      '',
+  telefono:      '',
   machineId:     '',
   nombreMaquina: '',
   desde:         fechaHoy(),
@@ -48,7 +49,7 @@ export default function NuevaLicencia() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({ ...form, esNuevoCliente: true }),
       })
@@ -78,7 +79,7 @@ export default function NuevaLicencia() {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-auth': sessionStorage.getItem('admin_auth'), // ← fix
+          'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
         body: JSON.stringify({
           contacto:      form.contacto,
@@ -129,65 +130,89 @@ export default function NuevaLicencia() {
 
         <form onSubmit={generar} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col gap-5">
 
-          <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la peluquería *</label>
-            <input className={inp} required value={form.peluqueria}
-              placeholder="Ej: Jofre Barber Shop"
-              onChange={e => setForm(f => ({ ...f, peluqueria: e.target.value }))} />
-          </div>
+          {/* ── Datos del cliente ── */}
+          <div className="pb-4 border-b border-zinc-800">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Datos del cliente</p>
 
-          <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Contacto / Email *</label>
-            <input className={inp} required type="email" value={form.contacto}
-              placeholder="Ej: jofre@gmail.com"
-              onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
-            <p className="text-xs text-zinc-600 mt-1">El email identifica al cliente y recibe la licencia. No puede repetirse.</p>
-          </div>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la peluquería *</label>
+                <input className={inp} required value={form.peluqueria}
+                  placeholder="Ej: Jofre Barber Shop"
+                  onChange={e => setForm(f => ({ ...f, peluqueria: e.target.value }))} />
+              </div>
 
-          <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Nombre descriptivo de la PC</label>
-            <input className={inp} value={form.nombreMaquina}
-              placeholder="Ej: PC Principal, Sucursal Centro, Notebook"
-              onChange={e => setForm(f => ({ ...f, nombreMaquina: e.target.value }))} />
-          </div>
-
-          <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Machine ID *</label>
-            <input className={inp} required value={form.machineId}
-              placeholder="ID que te mandó el cliente"
-              onChange={e => setForm(f => ({ ...f, machineId: e.target.value }))} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
-              <input type="date" className={inp} required value={form.desde}
-                onChange={e => setForm(f => ({ ...f, desde: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Vence *</label>
-              <input type="date" className={inp} required value={form.hasta} min={form.desde}
-                onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Email *</label>
+                  <input className={inp} required type="email" value={form.contacto}
+                    placeholder="jofre@gmail.com"
+                    onChange={e => setForm(f => ({ ...f, contacto: e.target.value }))} />
+                  <p className="text-xs text-zinc-600 mt-1">Para enviar la licencia y contactar</p>
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Teléfono / WhatsApp</label>
+                  <input className={inp} type="tel" value={form.telefono}
+                    placeholder="+54 9 11 1234-5678"
+                    onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
-              <input type="number" min="0" className={inp} value={form.precio}
-                placeholder="Ej: 20000"
-                onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
-              <input className={inp} value={form.notas}
-                placeholder="Ej: pagó 3 meses, descuento"
-                onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+          {/* ── Datos de la licencia ── */}
+          <div>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Licencia</p>
+
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Machine ID *</label>
+                  <input className={inp} required value={form.machineId}
+                    placeholder="ID único de la máquina"
+                    onChange={e => setForm(f => ({ ...f, machineId: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la máquina</label>
+                  <input className={inp} value={form.nombreMaquina}
+                    placeholder="Ej: PC Oficina"
+                    onChange={e => setForm(f => ({ ...f, nombreMaquina: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
+                  <input className={inp} required type="date" value={form.desde}
+                    onChange={e => setForm(f => ({ ...f, desde: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Hasta *</label>
+                  <input className={inp} required type="date" value={form.hasta}
+                    onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Precio cobrado ($)</label>
+                  <input className={inp} type="number" min="0" step="0.01" value={form.precio}
+                    placeholder="Ej: 15000"
+                    onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
+                  <p className="text-xs text-zinc-600 mt-1">Podés dejarlo vacío si aún no pagó</p>
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1.5 block">Notas internas</label>
+                  <input className={inp} value={form.notas}
+                    placeholder="Ej: amigo, paga el 20..."
+                    onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+                </div>
+              </div>
             </div>
           </div>
 
           {msg && (
-            <div className={`px-4 py-3 rounded-xl text-sm border ${
+            <div className={`text-sm px-4 py-3 rounded-xl border ${
               msg.tipo === 'ok'
                 ? 'bg-green-500/10 border-green-500/20 text-green-400'
                 : 'bg-red-500/10 border-red-500/20 text-red-400'
