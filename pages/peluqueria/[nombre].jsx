@@ -116,9 +116,10 @@ export default function DetallePeluqueria() {
   useEffect(() => {
     if (licencias.length > 0)
       setFormEditar({
-        nombre:   nombre || '',
-        contacto: licencias[0]?.contacto || '',
-        telefono: licencias[0]?.telefono || '',
+        nombre:          nombre || '',
+        contacto:        licencias[0]?.contacto        || '',
+        telefono:        licencias[0]?.telefono        || '',
+        nombre_contacto: licencias[0]?.nombre_contacto || '',
       })
   }, [licencias, nombre])
 
@@ -249,6 +250,7 @@ export default function DetallePeluqueria() {
           peluqueriaNueva:  formEditar.nombre.trim(),
           contacto:         formEditar.contacto.trim(),
           telefono:         formEditar.telefono.trim(),
+          nombre_contacto:  formEditar.nombre_contacto.trim(),
         }),
       })
       const data = await res.json()
@@ -361,6 +363,12 @@ export default function DetallePeluqueria() {
                 <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la peluquería *</label>
                 <input className={inp} required value={formEditar.nombre}
                   onChange={e => setFormEditar(f => ({ ...f, nombre: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la persona</label>
+                <input className={inp} value={formEditar.nombre_contacto}
+                  placeholder="Ej: Joaquín Jofre"
+                  onChange={e => setFormEditar(f => ({ ...f, nombre_contacto: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -601,6 +609,9 @@ export default function DetallePeluqueria() {
                 <div>
                   <h1 className="text-2xl font-bold text-white">{nombre}</h1>
                   <div className="flex flex-col gap-1 mt-1">
+                    {licencias[0]?.nombre_contacto && (
+                      <p className="text-zinc-300 text-sm font-medium">👤 {licencias[0].nombre_contacto}</p>
+                    )}
                     {licencias[0]?.contacto && (
                       <p className="text-zinc-500 text-sm">✉ {licencias[0].contacto}</p>
                     )}

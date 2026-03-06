@@ -8,15 +8,16 @@ function fechaHoy() {
 }
 
 const FORM_INICIAL = {
-  peluqueria:    '',
-  contacto:      '',
-  telefono:      '',
-  machineId:     '',
-  nombreMaquina: '',
-  desde:         fechaHoy(),
-  hasta:         '',
-  notas:         '',
-  precio:        '',
+  peluqueria:       '',
+  nombre_contacto:  '',
+  contacto:         '',
+  telefono:         '',
+  machineId:        '',
+  nombreMaquina:    '',
+  desde:            fechaHoy(),
+  hasta:            '',
+  notas:            '',
+  precio:           '',
 }
 
 
@@ -140,6 +141,13 @@ export default function NuevaLicencia() {
                 <input className={inp} required value={form.peluqueria}
                   placeholder="Ej: Jofre Barber Shop"
                   onChange={e => setForm(f => ({ ...f, peluqueria: e.target.value }))} />
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la persona</label>
+                <input className={inp} value={form.nombre_contacto}
+                  placeholder="Ej: Joaquín Jofre"
+                  onChange={e => setForm(f => ({ ...f, nombre_contacto: e.target.value }))} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

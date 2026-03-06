@@ -49,9 +49,9 @@ export default async function handler(req, res) {
   }
 
   // ── PUT ──────────────────────────────────────────────────────────────────
-  // body: { peluqueriaActual, peluqueriaNueva?, contacto?, telefono? }
+  // body: { peluqueriaActual, peluqueriaNueva?, contacto?, telefono?, nombre_contacto? }
   if (req.method === 'PUT') {
-    const { peluqueriaActual, peluqueriaNueva, contacto, telefono } = req.body
+    const { peluqueriaActual, peluqueriaNueva, contacto, telefono, nombre_contacto } = req.body
     if (!peluqueriaActual) return res.status(400).json({ error: 'Falta peluqueriaActual' })
 
     const updates = {}
@@ -61,6 +61,8 @@ export default async function handler(req, res) {
       updates.contacto = contacto.trim() || null
     if (telefono !== undefined)
       updates.telefono = telefono.trim() || null
+    if (nombre_contacto !== undefined)
+      updates.nombre_contacto = nombre_contacto.trim() || null
 
     if (!Object.keys(updates).length)
       return res.status(200).json({ ok: true, peluqueriaNueva: peluqueriaActual })

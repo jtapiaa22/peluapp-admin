@@ -71,6 +71,7 @@ export default function Dashboard() {
     }, {})
   ).map(([nombre, licencias]) => ({
     nombre,
+    nombre_contacto: licencias[0].nombre_contacto,
     contacto: licencias[0].contacto,
     telefono: licencias[0].telefono,
     licencias,
@@ -217,6 +218,9 @@ export default function Dashboard() {
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="font-semibold text-white text-base">{p.nombre}</h3>
+                          {p.nombre_contacto && (
+                            <p className="text-zinc-400 text-xs mt-0.5 font-medium">👤 {p.nombre_contacto}</p>
+                          )}
                           <p className="text-zinc-500 text-xs mt-0.5">{p.contacto || 'Sin email'}</p>
                           {p.telefono && (
                             <p className="text-zinc-600 text-xs mt-0.5">📞 {p.telefono}</p>
