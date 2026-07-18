@@ -104,6 +104,14 @@ export default function DetallePeluqueria() {
   // Email historial
   const [emailHistorial, setEmailHistorial] = useState({})
 
+  // Panel de turnos (clave del /admin de peluapp-web)
+  const [panelPeluquerias, setPanelPeluquerias] = useState([])
+  const [panelSel,         setPanelSel]         = useState('')
+  const [panelClave,       setPanelClave]       = useState('')
+  const [panelMsg,         setPanelMsg]         = useState(null)
+  const [panelLoading,     setPanelLoading]     = useState(false)
+  const [panelCopiado,     setPanelCopiado]     = useState(false)
+
   useEffect(() => {
     if (!sessionStorage.getItem('admin_auth')) router.push('/')
   }, []) // eslint-disable-line
@@ -138,6 +146,55 @@ export default function DetallePeluqueria() {
       setErrorCarga('No se pudo conectar con el servidor.')
     } finally {
       setCargando(false)
+    }
+    cargarPanelTurnos()
+  }
+
+  // ── Panel de turnos ───────────────────────────────────────────────────────
+  async function cargarPanelTurnos() {
+    try {
+      const auth = sessionStorage.getItem('admin_auth')
+      const r = await fetch(`/api/panel-turnos?nombre=${encodeURIComponent(nombre)}`, {
+        headers: { 'x-admin-auth': auth },
+      })
+      if (!r.ok) return
+      const d = await r.json()
+      setPanelPeluquerias(d.peluquerias || [])
+      // Si hay una sola coincidencia, la elegimos sola.
+      if ((d.peluquerias || []).length === 1) setPanelSel(d.peluquerias[0].id)
+    } catch {}
+  }
+
+  function generarClave() {
+    // Sin caracteres ambiguos (0/O, 1/l): se la va a dictar por teléfono.
+    const abc = 'abcdefghijkmnpqrstuvwxyz23456789'
+    let s = ''
+    for (let i = 0; i < 10; i++) s += abc[Math.floor(Math.random() * abc.length)]
+    setPanelClave(s)
+    setPanelMsg(null)
+  }
+
+  async function guardarClavePanel(e) {
+    e.preventDefault()
+    if (!panelSel) { setPanelMsg({ tipo: 'error', texto: 'Elegí la peluquería.' }); return }
+    if (panelClave.length < 6) { setPanelMsg({ tipo: 'error', texto: 'Mínimo 6 caracteres.' }); return }
+
+    setPanelLoading(true); setPanelMsg(null)
+    try {
+      const auth = sessionStorage.getItem('admin_auth')
+      const r = await fetch('/api/panel-turnos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-auth': auth },
+        body: JSON.stringify({ peluqueria_id: panelSel, clave: panelClave }),
+      })
+      const d = await r.json()
+      if (!r.ok) { setPanelMsg({ tipo: 'error', texto: d.error || 'No se pudo guardar.' }); return }
+      setPanelMsg({ tipo: 'ok', texto: 'Clave guardada. Pasásela al peluquero junto con el link.' })
+      cargarPanelTurnos()
+    } catch {
+      setPanelMsg({ tipo: 'error', texto: 'No se pudo conectar.' })
+    } finally {
+      setPanelLoading(false)
     }
   }
 
@@ -761,6 +818,91 @@ export default function DetallePeluqueria() {
                 )}
               </form>
             )}
+
+            {/* ── Panel de turnos ── */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
+              <h2 className="font-semibold text-white mb-1">📱 Panel de turnos</h2>
+              <p className="text-zinc-500 text-xs mb-4">
+                Clave para que el peluquero responda los turnos desde el celular.
+              </p>
+
+              {panelPeluquerias.length === 0 ? (
+                <p className="text-zinc-500 text-sm">
+                  Esta peluquería todavía no está registrada en el sistema de reservas online.
+                </p>
+              ) : (
+                <form onSubmit={guardarClavePanel} className="flex flex-col gap-3">
+                  {panelPeluquerias.length > 1 && (
+                    <div>
+                      <label className="text-zinc-400 text-xs block mb-1">
+                        Hay varias con nombre parecido — elegí cuál:
+                      </label>
+                      <select className={inp} value={panelSel} onChange={e => setPanelSel(e.target.value)}>
+                        <option value="">Seleccionar...</option>
+                        {panelPeluquerias.map(p => (
+                          <option key={p.id} value={p.id}>{p.nombre} — {p.email}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(() => {
+                    const sel = panelPeluquerias.find(p => p.id === panelSel)
+                    if (!sel) return null
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 text-xs">
+                          {sel.tieneClave ? (
+                            <span className="text-emerald-400">
+                              ✓ Ya tiene clave{sel.claveActualizada ? ` (${sel.claveActualizada.slice(0, 10)})` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-amber-400">Todavía no tiene clave</span>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input className={inp} value={panelClave} placeholder="Clave para el peluquero"
+                            onChange={e => { setPanelClave(e.target.value); setPanelMsg(null) }} />
+                          <button type="button" onClick={generarClave}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 rounded-lg transition-colors whitespace-nowrap">
+                            Generar
+                          </button>
+                        </div>
+
+                        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3">
+                          <p className="text-zinc-500 text-xs mb-1">Link para el peluquero:</p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-violet-400 text-xs font-mono break-all">
+                              https://servicio-turno-web-peluapp.xyz/admin?p={sel.id}
+                            </code>
+                            <button type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`https://servicio-turno-web-peluapp.xyz/admin?p=${sel.id}`)
+                                setPanelCopiado(true); setTimeout(() => setPanelCopiado(false), 2000)
+                              }}
+                              className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors whitespace-nowrap">
+                              {panelCopiado ? '✓' : 'Copiar'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {panelMsg && (
+                          <p className={`text-xs ${panelMsg.tipo === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {panelMsg.texto}
+                          </p>
+                        )}
+
+                        <button type="submit" disabled={panelLoading}
+                          className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
+                          {panelLoading ? 'Guardando...' : sel.tieneClave ? 'Reemplazar clave' : 'Guardar clave'}
+                        </button>
+                      </>
+                    )
+                  })()}
+                </form>
+              )}
+            </div>
 
             {/* ── Máquinas ── */}
             <div className="flex items-center justify-between mb-4">
