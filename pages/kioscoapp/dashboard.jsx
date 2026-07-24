@@ -29,7 +29,7 @@ function formatPrecio(n) {
 
 // ─── Página ──────────────────────────────────────────────────────────────────
 
-export default function Dashboard() {
+export default function KioscoDashboard() {
   const router = useRouter()
   const [historial, setHistorial] = useState([])
   const [pagos,     setPagos]     = useState([])
@@ -47,8 +47,8 @@ export default function Dashboard() {
     setCargando(true); setError(null)
     try {
       const [resLic, resPagos] = await Promise.all([
-        fetch('/api/licencias', { headers: { 'x-admin-auth': auth } }),
-        fetch('/api/pagos',     { headers: { 'x-admin-auth': auth } }),
+        fetch('/api/kioscoapp/licencias', { headers: { 'x-admin-auth': auth } }),
+        fetch('/api/kioscoapp/pagos',     { headers: { 'x-admin-auth': auth } }),
       ])
       if (resLic.status === 401) { sessionStorage.clear(); router.push('/'); return }
       if (!resLic.ok) throw new Error('Error al cargar licencias')
@@ -61,10 +61,10 @@ export default function Dashboard() {
     }
   }
 
-  // Agrupar por peluquería
-  const peluquerias = Object.entries(
+  // Agrupar por kiosco
+  const kioscos = Object.entries(
     historial.reduce((acc, lic) => {
-      const clave = lic.peluqueria
+      const clave = lic.kiosco
       if (!acc[clave]) acc[clave] = []
       acc[clave].push(lic)
       return acc
@@ -79,7 +79,6 @@ export default function Dashboard() {
     maquinas: [...new Set(licencias.map(l => l.machine_id))].length,
   }))
 
-  // Stats financieras basadas en PAGOS reales
   const ahora      = new Date()
   const mesActual  = ahora.getMonth()
   const anioActual = ahora.getFullYear()
@@ -90,53 +89,48 @@ export default function Dashboard() {
 
   const cobradoTotal = pagos.reduce((s, p) => s + Number(p.monto), 0)
 
-  // También mantener "precio licencias" como referencia
-  const preciosTotales = historial.reduce((s, l) => s + (Number(l.precio) || 0), 0)
-
   const stats = {
-    total:          peluquerias.length,
-    activas:        peluquerias.filter(p => getEstado(p.ultima.vence).label === 'Activa').length,
-    porVencer:      peluquerias.filter(p => getEstado(p.ultima.vence).label === 'Por vencer').length,
-    vencidas:       peluquerias.filter(p => getEstado(p.ultima.vence).label === 'Vencida').length,
+    total:          kioscos.length,
+    activas:        kioscos.filter(p => getEstado(p.ultima.vence).label === 'Activa').length,
+    porVencer:      kioscos.filter(p => getEstado(p.ultima.vence).label === 'Por vencer').length,
+    vencidas:       kioscos.filter(p => getEstado(p.ultima.vence).label === 'Vencida').length,
     cobradoMes,
     cobradoTotal,
-    preciosTotales,
   }
 
   const statCards = [
-    { label: 'Cobrado este mes', value: formatPrecio(stats.cobradoMes),    color: 'text-emerald-400', icon: '💰' },
-    { label: 'Total cobrado',    value: formatPrecio(stats.cobradoTotal),   color: 'text-emerald-300', icon: '📈' },
-    { label: 'Total clientes',   value: stats.total,      color: 'text-white',      icon: '🏪' },
-    { label: 'Activas',          value: stats.activas,    color: 'text-green-400',  icon: '✅' },
-    { label: 'Por vencer',       value: stats.porVencer,  color: 'text-yellow-400', icon: '⚠️' },
-    { label: 'Vencidas',         value: stats.vencidas,   color: 'text-red-400',    icon: '❌' },
+    { label: 'Cobrado este mes', value: formatPrecio(stats.cobradoMes),  color: 'text-emerald-400', icon: '💰' },
+    { label: 'Total cobrado',    value: formatPrecio(stats.cobradoTotal), color: 'text-emerald-300', icon: '📈' },
+    { label: 'Total clientes',   value: stats.total,     color: 'text-white',      icon: '🏪' },
+    { label: 'Activas',          value: stats.activas,   color: 'text-green-400',  icon: '✅' },
+    { label: 'Por vencer',       value: stats.porVencer, color: 'text-yellow-400', icon: '⚠️' },
+    { label: 'Vencidas',         value: stats.vencidas,  color: 'text-red-400',    icon: '❌' },
   ]
 
-  // ── Finanzas: pagos por mes ──────────────────────────────────────────────
   const pagosPorMes = pagos.reduce((acc, p) => {
-    const key = p.pagado_en.slice(0, 7) // YYYY-MM
+    const key = p.pagado_en.slice(0, 7)
     acc[key] = (acc[key] || 0) + Number(p.monto)
     return acc
   }, {})
   const mesesOrdenados = Object.entries(pagosPorMes).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12)
   const maxMes         = mesesOrdenados.length ? Math.max(...mesesOrdenados.map(m => m[1])) : 1
-
-  // Últimos pagos para mostrar en finanzas
-  const ultimosPagos = [...pagos].slice(0, 15)
+  const ultimosPagos   = [...pagos].slice(0, 15)
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
 
-      {/* Header */}
       <div className="border-b border-zinc-800/60 bg-zinc-900/50 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-xl">✂️</span>
-            <span className="font-bold text-white">PeluApp</span>
+            <span className="text-xl">🏪</span>
+            <span className="font-bold text-white">KioscoApp</span>
             <span className="text-zinc-600 text-sm">/ {tab === 'clientes' ? 'Licencias' : 'Finanzas'}</span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Tabs */}
+            <button onClick={() => router.push('/dashboard')}
+              className="text-zinc-500 hover:text-white border border-zinc-700 hover:border-zinc-500 text-sm px-3 py-2 rounded-lg transition-colors">
+              ✂️ PeluApp
+            </button>
             <div className="flex bg-zinc-800 rounded-lg p-1 gap-1 text-sm">
               <button onClick={() => setTab('clientes')}
                 className={`px-3 py-1.5 rounded-md transition-colors font-medium ${
@@ -151,13 +145,9 @@ export default function Dashboard() {
                 💰 Finanzas
               </button>
             </div>
-            <button onClick={() => router.push('/nueva-licencia')}
-              className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <button onClick={() => router.push('/kioscoapp/nueva-licencia')}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
               + Nueva licencia
-            </button>
-            <button onClick={() => router.push('/kioscoapp/dashboard')}
-              className="text-zinc-500 hover:text-white border border-zinc-700 hover:border-zinc-500 text-sm px-3 py-2 rounded-lg transition-colors">
-              🏪 KioscoApp
             </button>
             <button onClick={() => { sessionStorage.clear(); router.push('/') }}
               className="text-zinc-500 hover:text-white border border-zinc-700 hover:border-zinc-500 text-sm px-3 py-2 rounded-lg transition-colors">
@@ -169,7 +159,6 @@ export default function Dashboard() {
 
       <div className="max-w-6xl mx-auto px-6 py-8">
 
-        {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           {statCards.map(s => (
             <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -184,7 +173,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* ── TAB: CLIENTES ── */}
         {tab === 'clientes' && (
           <>
             <h2 className="text-sm font-medium text-zinc-400 mb-4 uppercase tracking-wider">Clientes</h2>
@@ -199,24 +187,24 @@ export default function Dashboard() {
                   Reintentar
                 </button>
               </div>
-            ) : peluquerias.length === 0 ? (
+            ) : kioscos.length === 0 ? (
               <div className="text-center py-20 text-zinc-600">
                 <div className="text-4xl mb-3">📋</div>
                 <p>Todavía no hay licencias generadas.</p>
-                <button onClick={() => router.push('/nueva-licencia')}
-                  className="mt-4 text-violet-400 hover:text-violet-300 text-sm underline">
+                <button onClick={() => router.push('/kioscoapp/nueva-licencia')}
+                  className="mt-4 text-blue-400 hover:text-blue-300 text-sm underline">
                   Generar la primera
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 fade-in">
-                {peluquerias.map(p => {
-                  const estado    = getEstado(p.ultima.vence)
-                  const pagosCliente = pagos.filter(pg => pg.peluqueria === p.nombre)
+                {kioscos.map(p => {
+                  const estado       = getEstado(p.ultima.vence)
+                  const pagosCliente = pagos.filter(pg => pg.kiosco === p.nombre)
                   const totalPagado  = pagosCliente.reduce((s, pg) => s + Number(pg.monto), 0)
                   return (
                     <div key={p.nombre}
-                      onClick={() => router.push(`/peluqueria/${encodeURIComponent(p.nombre)}`)}
+                      onClick={() => router.push(`/kioscoapp/${encodeURIComponent(p.nombre)}`)}
                       className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30">
 
                       <div className="flex items-start justify-between mb-4">
@@ -247,7 +235,7 @@ export default function Dashboard() {
                         </span>
                         {totalPagado > 0
                           ? <span className="text-emerald-400 text-xs font-semibold">{formatPrecio(totalPagado)} cobrado</span>
-                          : <span className="text-violet-400 text-xs font-medium">Ver detalle →</span>
+                          : <span className="text-blue-400 text-xs font-medium">Ver detalle →</span>
                         }
                       </div>
                     </div>
@@ -258,14 +246,12 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* ── TAB: FINANZAS ── */}
         {tab === 'finanzas' && (
           <div className="fade-in">
             <h2 className="text-sm font-medium text-zinc-400 mb-6 uppercase tracking-wider">Historial de cobros</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* Cobros por mes */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-5">📅 Cobros por mes</h3>
                 {mesesOrdenados.length === 0 ? (
@@ -283,10 +269,7 @@ export default function Dashboard() {
                             <span className="text-emerald-400 font-semibold">{formatPrecio(total)}</span>
                           </div>
                           <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500 rounded-full transition-all"
-                              style={{ width: `${pct}%` }}
-                            />
+                            <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       )
@@ -295,7 +278,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Últimos cobros */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-5">🧾 Últimos cobros</h3>
                 {ultimosPagos.length === 0 ? (
@@ -305,7 +287,7 @@ export default function Dashboard() {
                     {ultimosPagos.map(p => (
                       <div key={p.id} className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-3">
                         <div>
-                          <div className="text-white text-sm font-medium">{p.peluqueria}</div>
+                          <div className="text-white text-sm font-medium">{p.kiosco}</div>
                           <div className="text-zinc-500 text-xs mt-0.5">
                             {p.pagado_en} · {p.metodo}{p.nota ? ` · ${p.nota}` : ''}
                           </div>
@@ -319,7 +301,6 @@ export default function Dashboard() {
 
             </div>
 
-            {/* Resumen bottom */}
             {pagos.length > 0 && (
               <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <div className="grid grid-cols-3 gap-6 text-center">
@@ -328,7 +309,7 @@ export default function Dashboard() {
                     <div className="text-zinc-500 text-sm mt-1">Total cobrado histórico</div>
                   </div>
                   <div>
-                    <div className="text-3xl font-bold text-violet-400">{pagos.length}</div>
+                    <div className="text-3xl font-bold text-blue-400">{pagos.length}</div>
                     <div className="text-zinc-500 text-sm mt-1">Cobros registrados</div>
                   </div>
                   <div>
