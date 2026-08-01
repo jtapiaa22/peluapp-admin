@@ -99,6 +99,18 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: error.message })
 
+  // Alta de licencia y alta para reservas online (tabla `peluquerias`, la que usa panel-turnos.js)
+  // eran dos pasos separados: el cliente tenía que entrar a Configuración → Turnos Web → "Registrar"
+  // aparte de pagar la licencia. Para un cliente nuevo con email ya lo damos de alta acá también —
+  // mismo insert que hace `peluqueria:registrar` en la app, así que si el cliente después usa ese
+  // botón desde adentro, el manejo de email duplicado (23505) ya contemplado ahí lo engancha solo.
+  if (esNuevoCliente && contacto) {
+    const { error: errPeluqueria } = await sb.from('peluquerias').insert({ nombre: peluqueria, email: contacto, activo: true })
+    if (errPeluqueria && errPeluqueria.code !== '23505') {
+      console.error('No se pudo registrar en peluquerias:', errPeluqueria.message)
+    }
+  }
+
   // Si esta licencia viene de una solicitud de activación remota, la marcamos resuelta acá —
   // es lo que la app detecta en el siguiente poll (ver peluqueria_estado_solicitud en Supabase).
   if (solicitudId) {
