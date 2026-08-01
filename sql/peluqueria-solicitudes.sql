@@ -35,13 +35,18 @@ with check (estado = 'pendiente' and lic_base64 is null);
 
 -- Devuelve también "peluqueria" (a diferencia de kioscoapp_estado_solicitud) para que la app
 -- pueda precargar el nombre del negocio al activar, ya que el archivo .lic firmado no lo incluye.
+-- "contacto" (el email) se agrega para que la app pueda vincular sola la fila de `peluquerias`
+-- (turnos web) creada por generar-licencia.js al activar, sin pedirle al cliente que la registre
+-- de nuevo a mano desde Configuración.
+drop function if exists public.peluqueria_estado_solicitud(text);
+
 create or replace function public.peluqueria_estado_solicitud(p_machine_id text)
-returns table(estado text, lic_base64 text, desde date, vence date, peluqueria text)
+returns table(estado text, lic_base64 text, desde date, vence date, peluqueria text, contacto text)
 language sql
 security definer
 set search_path = public
 as $$
-    select estado, lic_base64, desde, vence, peluqueria
+    select estado, lic_base64, desde, vence, peluqueria, contacto
     from peluqueria_solicitudes
     where machine_id = p_machine_id
     order by creada_en desc
