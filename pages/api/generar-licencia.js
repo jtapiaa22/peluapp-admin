@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   const {
     peluqueria, contacto, machineId, nombreMaquina,
-    desde, hasta, notas, esNuevoCliente, esRenovacion, precio,
+    desde, hasta, notas, esNuevoCliente, esRenovacion, precio, solicitudId,
   } = req.body
 
   if (!peluqueria || !machineId || !desde || !hasta)
@@ -98,6 +98,15 @@ export default async function handler(req, res) {
   })
 
   if (error) return res.status(500).json({ error: error.message })
+
+  // Si esta licencia viene de una solicitud de activación remota, la marcamos resuelta acá —
+  // es lo que la app detecta en el siguiente poll (ver peluqueria_estado_solicitud en Supabase).
+  if (solicitudId) {
+    await sb
+      .from('peluqueria_solicitudes')
+      .update({ estado: 'activada', lic_base64: licBase64, desde, vence: hasta, resuelta_en: new Date().toISOString() })
+      .eq('id', solicitudId)
+  }
 
   return res.status(200).json({
     licBase64,

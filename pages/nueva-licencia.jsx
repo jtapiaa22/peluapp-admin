@@ -25,6 +25,7 @@ export default function NuevaLicencia() {
   const router = useRouter()
 
   const [form, setForm]                 = useState(FORM_INICIAL)
+  const [solicitudId, setSolicitudId]   = useState(null)
   const [loading, setLoading]           = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
   const [msg, setMsg]                   = useState(null)
@@ -33,8 +34,23 @@ export default function NuevaLicencia() {
   const inp = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-violet-500 transition-colors"
 
   useEffect(() => {
-    if (!sessionStorage.getItem('admin_auth')) router.push('/')
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!sessionStorage.getItem('admin_auth')) { router.push('/'); return }
+    if (!router.isReady) return
+
+    const { solicitudId: sid, peluqueria, nombre_contacto, contacto, telefono, machineId, nombreMaquina } = router.query
+    if (sid) {
+      setSolicitudId(sid)
+      setForm(f => ({
+        ...f,
+        peluqueria:      peluqueria      || f.peluqueria,
+        nombre_contacto: nombre_contacto || f.nombre_contacto,
+        contacto:        contacto        || f.contacto,
+        telefono:        telefono        || f.telefono,
+        machineId:       machineId       || f.machineId,
+        nombreMaquina:   nombreMaquina   || f.nombreMaquina,
+      }))
+    }
+  }, [router.isReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generar(e) {
     e.preventDefault()
@@ -52,7 +68,7 @@ export default function NuevaLicencia() {
           'Content-Type': 'application/json',
           'x-admin-auth': sessionStorage.getItem('admin_auth'),
         },
-        body: JSON.stringify({ ...form, esNuevoCliente: true }),
+        body: JSON.stringify({ ...form, esNuevoCliente: true, solicitudId }),
       })
       const data = await res.json()
       if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
@@ -127,6 +143,11 @@ export default function NuevaLicencia() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-white">Nuevo cliente</h1>
           <p className="text-zinc-500 text-sm mt-1">Completá los datos para generar la primera licencia</p>
+          {solicitudId && (
+            <span className="inline-block mt-2 text-xs font-medium px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400">
+              📨 Desde solicitud de activación remota
+            </span>
+          )}
         </div>
 
         <form onSubmit={generar} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col gap-5">

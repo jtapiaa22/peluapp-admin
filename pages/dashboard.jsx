@@ -31,11 +31,12 @@ function formatPrecio(n) {
 
 export default function Dashboard() {
   const router = useRouter()
-  const [historial, setHistorial] = useState([])
-  const [pagos,     setPagos]     = useState([])
-  const [cargando,  setCargando]  = useState(true)
-  const [error,     setError]     = useState(null)
-  const [tab,       setTab]       = useState('clientes') // 'clientes' | 'finanzas'
+  const [historial,   setHistorial]   = useState([])
+  const [pagos,       setPagos]       = useState([])
+  const [solicitudes, setSolicitudes] = useState([])
+  const [cargando,    setCargando]    = useState(true)
+  const [error,       setError]       = useState(null)
+  const [tab,         setTab]         = useState('clientes') // 'clientes' | 'finanzas' | 'solicitudes'
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth')
@@ -46,19 +47,66 @@ export default function Dashboard() {
   async function cargarTodo(auth) {
     setCargando(true); setError(null)
     try {
-      const [resLic, resPagos] = await Promise.all([
-        fetch('/api/licencias', { headers: { 'x-admin-auth': auth } }),
-        fetch('/api/pagos',     { headers: { 'x-admin-auth': auth } }),
+      const [resLic, resPagos, resSol] = await Promise.all([
+        fetch('/api/licencias',   { headers: { 'x-admin-auth': auth } }),
+        fetch('/api/pagos',       { headers: { 'x-admin-auth': auth } }),
+        fetch('/api/solicitudes?estado=pendiente', { headers: { 'x-admin-auth': auth } }),
       ])
       if (resLic.status === 401) { sessionStorage.clear(); router.push('/'); return }
       if (!resLic.ok) throw new Error('Error al cargar licencias')
       setHistorial(await resLic.json() || [])
       setPagos(resPagos.ok ? (await resPagos.json() || []) : [])
+      setSolicitudes(resSol.ok ? (await resSol.json() || []) : [])
     } catch (e) {
       setError(e.message)
     } finally {
       setCargando(false)
     }
+  }
+
+  async function rechazarSolicitud(id) {
+    const auth = sessionStorage.getItem('admin_auth')
+    await fetch(`/api/solicitudes?id=${id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': auth },
+      body:    JSON.stringify({ estado: 'rechazada' }),
+    })
+    setSolicitudes(s => s.filter(x => x.id !== id))
+  }
+
+  // Decide a dónde mandar el "Activar" según si la solicitud es de un cliente nuevo, una
+  // renovación (misma máquina ya tiene licencia) o una máquina nueva de un cliente que ya existe
+  // (mismo email, otra máquina) — evita el error de "contacto duplicado" de nueva-licencia.jsx.
+  function activarSolicitud(s) {
+    const mismaMaquina = historial.find(l => l.machine_id === s.machine_id)
+    if (mismaMaquina) {
+      const params = new URLSearchParams({ solicitudId: s.id, machineId: s.machine_id })
+      router.push(`/peluqueria/${encodeURIComponent(mismaMaquina.peluqueria)}?${params.toString()}`)
+      return
+    }
+
+    const mismoCliente = s.contacto && historial.find(l => l.contacto?.toLowerCase() === s.contacto.toLowerCase())
+    if (mismoCliente) {
+      const params = new URLSearchParams({
+        solicitudId:    s.id,
+        agregarMaquina: '1',
+        machineId:      s.machine_id || '',
+        nombreMaquina:  s.nombre_maquina || '',
+      })
+      router.push(`/peluqueria/${encodeURIComponent(mismoCliente.peluqueria)}?${params.toString()}`)
+      return
+    }
+
+    const params = new URLSearchParams({
+      solicitudId:     s.id,
+      peluqueria:      s.peluqueria || '',
+      nombre_contacto: s.nombre_contacto || '',
+      contacto:        s.contacto || '',
+      telefono:        s.telefono || '',
+      machineId:       s.machine_id || '',
+      nombreMaquina:   s.nombre_maquina || '',
+    })
+    router.push(`/nueva-licencia?${params.toString()}`)
   }
 
   // Agrupar por peluquería
@@ -133,7 +181,9 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <span className="text-xl">✂️</span>
             <span className="font-bold text-white">PeluApp</span>
-            <span className="text-zinc-600 text-sm">/ {tab === 'clientes' ? 'Licencias' : 'Finanzas'}</span>
+            <span className="text-zinc-600 text-sm">
+              / {tab === 'clientes' ? 'Licencias' : tab === 'finanzas' ? 'Finanzas' : 'Solicitudes'}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {/* Tabs */}
@@ -143,6 +193,17 @@ export default function Dashboard() {
                   tab === 'clientes' ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white'
                 }`}>
                 🏪 Clientes
+              </button>
+              <button onClick={() => setTab('solicitudes')}
+                className={`relative px-3 py-1.5 rounded-md transition-colors font-medium ${
+                  tab === 'solicitudes' ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white'
+                }`}>
+                📨 Solicitudes
+                {solicitudes.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-violet-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {solicitudes.length}
+                  </span>
+                )}
               </button>
               <button onClick={() => setTab('finanzas')}
                 className={`px-3 py-1.5 rounded-md transition-colors font-medium ${
@@ -256,6 +317,47 @@ export default function Dashboard() {
               </div>
             )}
           </>
+        )}
+
+        {/* ── TAB: SOLICITUDES ── */}
+        {tab === 'solicitudes' && (
+          <div className="fade-in">
+            <h2 className="text-sm font-medium text-zinc-400 mb-4 uppercase tracking-wider">Solicitudes de activación remota</h2>
+
+            {cargando ? (
+              <div className="text-zinc-600 text-sm">Cargando…</div>
+            ) : solicitudes.length === 0 ? (
+              <div className="text-center py-20 text-zinc-600">
+                <div className="text-4xl mb-3">📨</div>
+                <p>No hay solicitudes pendientes.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {solicitudes.map(s => (
+                  <div key={s.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                    <h3 className="font-semibold text-white text-base">{s.peluqueria}</h3>
+                    {s.nombre_contacto && <p className="text-zinc-400 text-xs mt-0.5 font-medium">👤 {s.nombre_contacto}</p>}
+                    <p className="text-zinc-500 text-xs mt-0.5">{s.contacto || 'Sin email'}</p>
+                    {s.telefono && <p className="text-zinc-600 text-xs mt-0.5">📞 {s.telefono}</p>}
+                    <p className="text-zinc-600 text-xs mt-2 font-mono break-all">🖥 {s.machine_id}</p>
+                    {s.nombre_maquina && <p className="text-zinc-600 text-xs mt-0.5">{s.nombre_maquina}</p>}
+                    <p className="text-zinc-700 text-xs mt-2">{new Date(s.creada_en).toLocaleString('es-AR')}</p>
+
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-zinc-800">
+                      <button onClick={() => activarSolicitud(s)}
+                        className="flex-1 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+                        Activar
+                      </button>
+                      <button onClick={() => rechazarSolicitud(s.id)}
+                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium py-2 rounded-lg transition-colors">
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ── TAB: FINANZAS ── */}

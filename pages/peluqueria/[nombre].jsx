@@ -72,6 +72,7 @@ export default function DetallePeluqueria() {
   const [loading,          setLoading]          = useState(false)
   const [msg,              setMsg]              = useState(null)
   const [licRenovada,      setLicRenovada]      = useState(null)
+  const [solicitudId,      setSolicitudId]      = useState(null)
 
   // Agregar máquina
   const [modalNuevaMaq,    setModalNuevaMaq]    = useState(false)
@@ -130,6 +131,26 @@ export default function DetallePeluqueria() {
         nombre_contacto: licencias[0]?.nombre_contacto || '',
       })
   }, [licencias, nombre])
+
+  // Llega desde el botón "Activar" de la pestaña Solicitudes del dashboard: precarga el form de
+  // renovar (misma máquina) o el modal de agregar máquina (cliente conocido, máquina nueva), y
+  // guarda el solicitudId para que generar-licencia.js marque la solicitud como resuelta.
+  useEffect(() => {
+    if (!isReady || licencias.length === 0) return
+    const { solicitudId: sid, machineId: mid, agregarMaquina: addFlag, nombreMaquina: nmaq } = router.query
+    if (!sid) return
+    setSolicitudId(sid)
+    if (addFlag) {
+      setFormNueva(f => ({ ...f, machineId: mid || '', nombreMaquina: nmaq || '' }))
+      setModalNuevaMaq(true)
+    } else if (mid) {
+      const lic = licencias.find(l => l.machine_id === mid)
+      setMachineIdSel(mid)
+      setNombreMaqSel(lic?.nombre_maquina || null)
+      setMostrarForm(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [isReady, licencias]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargarTodo() {
     setCargando(true); setErrorCarga(null)
@@ -252,13 +273,14 @@ export default function DetallePeluqueria() {
           peluqueria: nombre, contacto: licencias[0]?.contacto || '',
           machineId: machineIdSel, nombreMaquina: nombreMaqSel,
           desde: form.desde, hasta: form.hasta, notas: form.notas, precio: form.precio,
-          esNuevoCliente: false, esRenovacion: true,
+          esNuevoCliente: false, esRenovacion: true, solicitudId,
         }),
       })
       const data = await res.json()
       if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
       setLicRenovada({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: form.hasta })
       setMsg({ tipo: 'ok', texto: '✅ Licencia renovada correctamente' })
+      setSolicitudId(null)
       cargarTodo()
     } catch {
       setMsg({ tipo: 'error', texto: 'No se pudo conectar.' })
@@ -279,13 +301,14 @@ export default function DetallePeluqueria() {
           peluqueria: nombre, contacto: licencias[0]?.contacto || '',
           machineId: formNueva.machineId, nombreMaquina: formNueva.nombreMaquina,
           desde: formNueva.desde, hasta: formNueva.hasta, notas: formNueva.notas, precio: formNueva.precio,
-          esNuevoCliente: false, esRenovacion: false,
+          esNuevoCliente: false, esRenovacion: false, solicitudId,
         }),
       })
       const data = await res.json()
       if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
       setLicNueva({ licBase64: data.licBase64, nombreArchivo: data.nombreArchivo, vence: formNueva.hasta })
       setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada correctamente' })
+      setSolicitudId(null)
       cargarTodo()
     } catch {
       setMsgNueva({ tipo: 'error', texto: 'No se pudo conectar.' })
@@ -564,9 +587,16 @@ export default function DetallePeluqueria() {
 
       {/* ── Modal: agregar máquina ── */}
       {modalNuevaMaq && (
-        <Modal onClose={() => { setModalNuevaMaq(false); setMsgNueva(null); setLicNueva(null); setFormNueva(FORM_INICIAL) }}>
+        <Modal onClose={() => { setModalNuevaMaq(false); setMsgNueva(null); setLicNueva(null); setFormNueva(FORM_INICIAL); setSolicitudId(null) }}>
           <div className="p-6">
-            <h3 className="text-lg font-bold text-white mb-5">➕ Agregar máquina</h3>
+            <div className="mb-5">
+              <h3 className="text-lg font-bold text-white">➕ Agregar máquina</h3>
+              {solicitudId && (
+                <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400">
+                  📨 Desde solicitud de activación remota
+                </span>
+              )}
+            </div>
             <form onSubmit={agregarMaquina} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -623,7 +653,7 @@ export default function DetallePeluqueria() {
                 </div>
               ) : (
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setModalNuevaMaq(false); setFormNueva(FORM_INICIAL) }}
+                  <button type="button" onClick={() => { setModalNuevaMaq(false); setFormNueva(FORM_INICIAL); setSolicitudId(null) }}
                     className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm">
                     Cancelar
                   </button>
@@ -767,8 +797,13 @@ export default function DetallePeluqueria() {
                     <p className="text-xs text-zinc-500 mt-0.5">
                       {nombreMaqSel ? `Máquina: ${nombreMaqSel}` : `Machine ID: ${machineIdSel}`}
                     </p>
+                    {solicitudId && (
+                      <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400">
+                        📨 Desde solicitud de activación remota
+                      </span>
+                    )}
                   </div>
-                  <button type="button" onClick={() => { setMostrarForm(false); setMsg(null); setLicRenovada(null) }}
+                  <button type="button" onClick={() => { setMostrarForm(false); setMsg(null); setLicRenovada(null); setSolicitudId(null) }}
                     className="text-zinc-600 hover:text-white text-sm">✕</button>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -953,6 +988,7 @@ export default function DetallePeluqueria() {
                       setNombreMaqSel(maq.ultima.nombre_maquina || null)
                       setMostrarForm(true); setLicRenovada(null); setMsg(null)
                       setForm(FORM_INICIAL)
+                      setSolicitudId(null)
                       window.scrollTo({ top: 0, behavior: 'smooth' })
                     }}
                       className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-400/60 px-3 py-1.5 rounded-lg transition-colors mb-5">
