@@ -74,7 +74,29 @@ export default function KioscoDashboard() {
     setSolicitudes(s => s.filter(x => x.id !== id))
   }
 
+  // Decide a dónde mandar el "Activar" según si la solicitud es de un cliente nuevo, una
+  // renovación (misma máquina ya tiene licencia) o una máquina nueva de un cliente que ya existe
+  // (mismo email, otra máquina) — evita el error de "contacto duplicado" de nueva-licencia.jsx.
   function activarSolicitud(s) {
+    const mismaMaquina = historial.find(l => l.machine_id === s.machine_id)
+    if (mismaMaquina) {
+      const params = new URLSearchParams({ solicitudId: s.id, machineId: s.machine_id })
+      router.push(`/kioscoapp/${encodeURIComponent(mismaMaquina.kiosco)}?${params.toString()}`)
+      return
+    }
+
+    const mismoCliente = s.contacto && historial.find(l => l.contacto?.toLowerCase() === s.contacto.toLowerCase())
+    if (mismoCliente) {
+      const params = new URLSearchParams({
+        solicitudId:    s.id,
+        agregarMaquina: '1',
+        machineId:      s.machine_id || '',
+        nombreMaquina:  s.nombre_maquina || '',
+      })
+      router.push(`/kioscoapp/${encodeURIComponent(mismoCliente.kiosco)}?${params.toString()}`)
+      return
+    }
+
     const params = new URLSearchParams({
       solicitudId:    s.id,
       kiosco:         s.kiosco || '',
