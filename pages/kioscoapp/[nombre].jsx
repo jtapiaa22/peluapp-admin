@@ -1,46 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import {
+  ArrowLeft, Pencil, Trash2, Wallet, Coins, Inbox, MonitorSmartphone,
+  Copy, Check, Mail, RotateCw, Plus, X, TriangleAlert, User, Phone, AtSign, Cloud, CloudDownload,
+} from 'lucide-react'
+import { Shell, TopBar, Main, BackLink } from '@/components/Layout'
+import { Badge, Card, Field, Input, Select, Alert, Button, Modal } from '@/components/ui'
+import { getEstado, formatPrecio } from '@/lib/format'
 
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function fechaHoy() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
-
-function diasRestantes(vence) {
-  const hoy = new Date(fechaHoy() + 'T00:00:00')
-  const fv  = new Date(vence     + 'T00:00:00')
-  return Math.round((fv - hoy) / (1000 * 60 * 60 * 24)) + 1
-}
-
-function getEstado(vence) {
-  const dias = diasRestantes(vence)
-  if (dias < 0)   return { label: 'Vencida',    bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400',    dot: 'bg-red-400',              dias }
-  if (dias <= 15) return { label: 'Por vencer', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400 pulse-soft', dias }
-  return            { label: 'Activa',      bg: 'bg-green-500/10',  border: 'border-green-500/20',  text: 'text-green-400',  dot: 'bg-green-400',            dias }
-}
-
-function formatPrecio(n) {
-  return '$' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0 })
-}
-
-// ─── Modal wrapper ───────────────────────────────────────────────────────────
-
-function Modal({ onClose, children }) {
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-
-// ─── Página ──────────────────────────────────────────────────────────────────
 
 const FORM_INICIAL = {
   machineId:     '',
@@ -55,8 +27,6 @@ export default function DetalleKiosco() {
   const router  = useRouter()
   const { nombre } = router.query
   const isReady    = router.isReady
-
-  const inp = 'w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors'
 
   const [licencias,        setLicencias]        = useState([])
   const [pagos,            setPagos]            = useState([])
@@ -180,7 +150,7 @@ export default function DetalleKiosco() {
           licenciaKey: licData.licenciaKey, vence: licData.vence,
         }),
       })
-      setMsgFn({ tipo: res.ok ? 'ok' : 'error', texto: res.ok ? `✅ Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email' })
+      setMsgFn({ tipo: res.ok ? 'ok' : 'error', texto: res.ok ? `Email enviado a ${licencias[0]?.contacto}` : 'Error al enviar el email' })
     } catch {
       setMsgFn({ tipo: 'error', texto: 'No se pudo conectar.' })
     } finally {
@@ -226,7 +196,7 @@ export default function DetalleKiosco() {
       const data = await res.json()
       if (!res.ok) return setMsg({ tipo: 'error', texto: data.error })
       setLicRenovada({ licenciaKey: data.licenciaKey, vence: form.hasta })
-      setMsg({ tipo: 'ok', texto: '✅ Licencia renovada correctamente' })
+      setMsg({ tipo: 'ok', texto: 'Licencia renovada correctamente' })
       setSolicitudId(null)
       cargarTodo()
     } catch {
@@ -254,7 +224,7 @@ export default function DetalleKiosco() {
       const data = await res.json()
       if (!res.ok) return setMsgNueva({ tipo: 'error', texto: data.error })
       setLicNueva({ licenciaKey: data.licenciaKey, vence: formNueva.hasta })
-      setMsgNueva({ tipo: 'ok', texto: '✅ Máquina agregada correctamente' })
+      setMsgNueva({ tipo: 'ok', texto: 'Máquina agregada correctamente' })
       setSolicitudId(null)
       cargarTodo()
     } catch {
@@ -282,7 +252,7 @@ export default function DetalleKiosco() {
       })
       const data = await res.json()
       if (!res.ok) return setMsgEditar({ tipo: 'error', texto: data.error })
-      setMsgEditar({ tipo: 'ok', texto: '✅ Datos actualizados' })
+      setMsgEditar({ tipo: 'ok', texto: 'Datos actualizados' })
       if (data.kioscoNuevo && data.kioscoNuevo !== nombre) {
         setTimeout(() => router.replace('/kioscoapp/' + encodeURIComponent(data.kioscoNuevo)), 1000)
       } else {
@@ -308,7 +278,7 @@ export default function DetalleKiosco() {
       })
       const data = await res.json()
       if (!res.ok) return setMsgPago({ tipo: 'error', texto: data.error })
-      setMsgPago({ tipo: 'ok', texto: '✅ Cobro registrado' })
+      setMsgPago({ tipo: 'ok', texto: 'Cobro registrado' })
       setPagos(prev => [data, ...prev])
       setTimeout(() => { setModalPago(false); setMsgPago(null); setFormPago({ monto: '', pagado_en: fechaHoy(), metodo: 'Transferencia', nota: '' }) }, 1000)
     } catch {
@@ -378,52 +348,35 @@ export default function DetalleKiosco() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-
+    <Shell>
       {modalEditar && (
         <Modal onClose={() => { setModalEditar(false); setMsgEditar(null) }}>
           <div className="p-6">
-            <h3 className="text-lg font-bold text-white mb-5">✏️ Editar cliente</h3>
+            <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2"><Pencil size={18} /> Editar cliente</h3>
             <form onSubmit={guardarEdicion} className="space-y-4">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Nombre del kiosco *</label>
-                <input className={inp} required value={formEditar.nombre}
-                  onChange={e => setFormEditar(f => ({ ...f, nombre: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Nombre de la persona</label>
-                <input className={inp} value={formEditar.nombre_contacto}
-                  placeholder="Ej: José Pérez"
+              <Field label="Nombre del kiosco *">
+                <Input accent="blue" required value={formEditar.nombre} onChange={e => setFormEditar(f => ({ ...f, nombre: e.target.value }))} />
+              </Field>
+              <Field label="Nombre de la persona">
+                <Input accent="blue" value={formEditar.nombre_contacto} placeholder="Ej: José Pérez"
                   onChange={e => setFormEditar(f => ({ ...f, nombre_contacto: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Email</label>
-                  <input className={inp} type="email" value={formEditar.contacto}
-                    placeholder="email@ejemplo.com"
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Email">
+                  <Input accent="blue" type="email" value={formEditar.contacto} placeholder="email@ejemplo.com"
                     onChange={e => setFormEditar(f => ({ ...f, contacto: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Teléfono / WhatsApp</label>
-                  <input className={inp} type="tel" value={formEditar.telefono}
-                    placeholder="+54 9 11..."
+                </Field>
+                <Field label="Teléfono / WhatsApp">
+                  <Input accent="blue" type="tel" value={formEditar.telefono} placeholder="+54 9 11..."
                     onChange={e => setFormEditar(f => ({ ...f, telefono: e.target.value }))} />
-                </div>
+                </Field>
               </div>
-              {msgEditar && (
-                <p className={`text-sm px-3 py-2 rounded-lg ${
-                  msgEditar.tipo === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                }`}>{msgEditar.texto}</p>
-              )}
+              {msgEditar && <Alert tone={msgEditar.tipo}>{msgEditar.texto}</Alert>}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setModalEditar(false); setMsgEditar(null) }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={loadingEditar}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
+                <Button type="button" variant="ghost" className="flex-1" onClick={() => { setModalEditar(false); setMsgEditar(null) }}>Cancelar</Button>
+                <Button type="submit" variant="primary" accent="blue" className="flex-1" disabled={loadingEditar}>
                   {loadingEditar ? 'Guardando…' : 'Guardar cambios'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -433,53 +386,37 @@ export default function DetalleKiosco() {
       {modalPago && (
         <Modal onClose={() => { setModalPago(false); setMsgPago(null) }}>
           <div className="p-6">
-            <h3 className="text-lg font-bold text-white mb-1">💰 Registrar cobro</h3>
+            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2"><Wallet size={18} /> Registrar cobro</h3>
             <p className="text-zinc-500 text-sm mb-5">Anotá cuándo y cuánto te pagó <strong className="text-white">{nombre}</strong></p>
             <form onSubmit={registrarPago} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Monto ($) *</label>
-                  <input className={inp} required type="number" min="1" step="0.01"
-                    value={formPago.monto} placeholder="Ej: 15000"
+                <Field label="Monto ($) *">
+                  <Input accent="blue" required type="number" min="1" step="0.01" value={formPago.monto} placeholder="Ej: 15000"
                     onChange={e => setFormPago(f => ({ ...f, monto: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Fecha de pago *</label>
-                  <input className={inp} required type="date"
-                    value={formPago.pagado_en}
+                </Field>
+                <Field label="Fecha de pago *">
+                  <Input accent="blue" required type="date" value={formPago.pagado_en}
                     onChange={e => setFormPago(f => ({ ...f, pagado_en: e.target.value }))} />
-                </div>
+                </Field>
               </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Método</label>
-                <select className={inp} value={formPago.metodo}
-                  onChange={e => setFormPago(f => ({ ...f, metodo: e.target.value }))}>
+              <Field label="Método">
+                <Select accent="blue" value={formPago.metodo} onChange={e => setFormPago(f => ({ ...f, metodo: e.target.value }))}>
                   <option>Transferencia</option>
                   <option>Efectivo</option>
                   <option>MercadoPago</option>
                   <option>Otro</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Nota (opcional)</label>
-                <input className={inp} value={formPago.nota}
-                  placeholder="Ej: pago del mes de marzo, renovación..."
+                </Select>
+              </Field>
+              <Field label="Nota (opcional)">
+                <Input accent="blue" value={formPago.nota} placeholder="Ej: pago del mes de marzo, renovación..."
                   onChange={e => setFormPago(f => ({ ...f, nota: e.target.value }))} />
-              </div>
-              {msgPago && (
-                <p className={`text-sm px-3 py-2 rounded-lg ${
-                  msgPago.tipo === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                }`}>{msgPago.texto}</p>
-              )}
+              </Field>
+              {msgPago && <Alert tone={msgPago.tipo}>{msgPago.texto}</Alert>}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setModalPago(false); setMsgPago(null) }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={loadingPago}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
-                  {loadingPago ? 'Guardando…' : '✓ Registrar cobro'}
-                </button>
+                <Button type="button" variant="ghost" className="flex-1" onClick={() => { setModalPago(false); setMsgPago(null) }}>Cancelar</Button>
+                <Button type="submit" variant="ghost" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white" disabled={loadingPago}>
+                  {loadingPago ? 'Guardando…' : <><Check size={15} /> Registrar cobro</>}
+                </Button>
               </div>
             </form>
           </div>
@@ -489,19 +426,15 @@ export default function DetalleKiosco() {
       {confirmEliminarCliente && (
         <Modal onClose={() => setConfirmEliminarCliente(false)}>
           <div className="p-6">
-            <h3 className="text-lg font-bold text-red-400 mb-2">⚠️ Eliminar cliente</h3>
+            <h3 className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2"><TriangleAlert size={18} /> Eliminar cliente</h3>
             <p className="text-zinc-400 text-sm mb-5">
               Vas a eliminar <strong className="text-white">{nombre}</strong> y todas sus licencias y cobros. Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmEliminarCliente(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm transition-colors">
-                Cancelar
-              </button>
-              <button onClick={eliminarCliente} disabled={loadingEliminarCliente}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
+              <Button variant="ghost" className="flex-1" onClick={() => setConfirmEliminarCliente(false)}>Cancelar</Button>
+              <Button variant="danger" className="flex-1" disabled={loadingEliminarCliente} onClick={eliminarCliente}>
                 {loadingEliminarCliente ? 'Eliminando…' : 'Sí, eliminar'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>
@@ -513,14 +446,10 @@ export default function DetalleKiosco() {
             <h3 className="text-lg font-bold text-red-400 mb-2">Eliminar licencia</h3>
             <p className="text-zinc-400 text-sm mb-5">¿Confirmar eliminación de esta licencia?</p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmEliminarLic(null)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm transition-colors">
-                Cancelar
-              </button>
-              <button onClick={() => eliminarLicencia(confirmEliminarLic)} disabled={loadingEliminarLic}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm transition-colors">
+              <Button variant="ghost" className="flex-1" onClick={() => setConfirmEliminarLic(null)}>Cancelar</Button>
+              <Button variant="danger" className="flex-1" disabled={loadingEliminarLic} onClick={() => eliminarLicencia(confirmEliminarLic)}>
                 {loadingEliminarLic ? 'Eliminando…' : 'Eliminar'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>
@@ -530,82 +459,63 @@ export default function DetalleKiosco() {
         <Modal onClose={() => { setModalNuevaMaq(false); setMsgNueva(null); setLicNueva(null); setFormNueva(FORM_INICIAL); setSolicitudId(null) }}>
           <div className="p-6">
             <div className="mb-5">
-              <h3 className="text-lg font-bold text-white">➕ Agregar máquina</h3>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2"><Plus size={18} /> Agregar máquina</h3>
               {solicitudId && (
-                <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                  📨 Desde solicitud de activación remota
-                </span>
+                <Badge tone="blue" className="mt-1.5"><Inbox size={12} /> Desde solicitud de activación remota</Badge>
               )}
             </div>
             <form onSubmit={agregarMaquina} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Machine ID *</label>
-                  <input className={inp} required value={formNueva.machineId} placeholder="ID único"
+                <Field label="Machine ID *">
+                  <Input accent="blue" required value={formNueva.machineId} placeholder="ID único"
                     onChange={e => setFormNueva(f => ({ ...f, machineId: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Nombre máquina</label>
-                  <input className={inp} value={formNueva.nombreMaquina} placeholder="Ej: PC Caja"
+                </Field>
+                <Field label="Nombre máquina">
+                  <Input accent="blue" value={formNueva.nombreMaquina} placeholder="Ej: PC Caja"
                     onChange={e => setFormNueva(f => ({ ...f, nombreMaquina: e.target.value }))} />
-                </div>
+                </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
-                  <input className={inp} required type="date" value={formNueva.desde}
-                    onChange={e => setFormNueva(f => ({ ...f, desde: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Hasta *</label>
-                  <input className={inp} required type="date" value={formNueva.hasta}
-                    onChange={e => setFormNueva(f => ({ ...f, hasta: e.target.value }))} />
-                </div>
+                <Field label="Desde *">
+                  <Input accent="blue" required type="date" value={formNueva.desde} onChange={e => setFormNueva(f => ({ ...f, desde: e.target.value }))} />
+                </Field>
+                <Field label="Hasta *">
+                  <Input accent="blue" required type="date" value={formNueva.hasta} onChange={e => setFormNueva(f => ({ ...f, hasta: e.target.value }))} />
+                </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Precio ($)</label>
-                  <input className={inp} type="number" min="0" value={formNueva.precio} placeholder="Opcional"
+                <Field label="Precio ($)">
+                  <Input accent="blue" type="number" min="0" value={formNueva.precio} placeholder="Opcional"
                     onChange={e => setFormNueva(f => ({ ...f, precio: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1.5 block">Notas</label>
-                  <input className={inp} value={formNueva.notas} placeholder="Opcional"
-                    onChange={e => setFormNueva(f => ({ ...f, notas: e.target.value }))} />
-                </div>
+                </Field>
+                <Field label="Notas">
+                  <Input accent="blue" value={formNueva.notas} placeholder="Opcional" onChange={e => setFormNueva(f => ({ ...f, notas: e.target.value }))} />
+                </Field>
               </div>
-              {msgNueva && (
-                <p className={`text-sm px-3 py-2 rounded-lg ${
-                  msgNueva.tipo === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                }`}>{msgNueva.texto}</p>
-              )}
+              {msgNueva && <Alert tone={msgNueva.tipo}>{msgNueva.texto}</Alert>}
               {licNueva ? (
                 <>
                   <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
                     <code className="text-blue-300 text-xs font-mono break-all">{licNueva.licenciaKey}</code>
                   </div>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => { navigator.clipboard.writeText(licNueva.licenciaKey) }}
-                      className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white py-2.5 rounded-xl text-sm">
-                      📋 Copiar clave
-                    </button>
-                    <button type="button" disabled={!licencias[0]?.contacto}
-                      onClick={() => enviarEmailLic(licNueva, setLoadingNueva, setMsgNueva)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm">
-                      ✉ Enviar email
-                    </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button type="button" variant="ghost" className="flex-1" onClick={() => navigator.clipboard.writeText(licNueva.licenciaKey)}>
+                      <Copy size={15} /> Copiar clave
+                    </Button>
+                    <Button type="button" variant="primary" accent="blue" className="flex-1" disabled={!licencias[0]?.contacto}
+                      onClick={() => enviarEmailLic(licNueva, setLoadingNueva, setMsgNueva)}>
+                      <Mail size={15} /> Enviar email
+                    </Button>
                   </div>
                 </>
               ) : (
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setModalNuevaMaq(false); setFormNueva(FORM_INICIAL); setSolicitudId(null) }}
-                    className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm">
+                  <Button type="button" variant="ghost" className="flex-1" onClick={() => { setModalNuevaMaq(false); setFormNueva(FORM_INICIAL); setSolicitudId(null) }}>
                     Cancelar
-                  </button>
-                  <button type="submit" disabled={loadingNueva}
-                    className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm">
+                  </Button>
+                  <Button type="submit" variant="primary" accent="blue" className="flex-1" disabled={loadingNueva}>
                     {loadingNueva ? 'Generando…' : 'Generar licencia'}
-                  </button>
+                  </Button>
                 </div>
               )}
             </form>
@@ -613,62 +523,49 @@ export default function DetalleKiosco() {
         </Modal>
       )}
 
-      <div className="border-b border-zinc-800/60 bg-zinc-900/50 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button onClick={() => router.push('/kioscoapp/dashboard')}
-            className="text-zinc-400 hover:text-white transition-colors text-sm">
-            ← Dashboard
-          </button>
-          <span className="text-zinc-700">|</span>
-          <span className="text-zinc-300 font-medium truncate">{nombre}</span>
-        </div>
-      </div>
+      <TopBar>
+        <BackLink icon={ArrowLeft} label="Dashboard" onClick={() => router.push('/kioscoapp/dashboard')} />
+        <span className="text-zinc-700">|</span>
+        <span className="text-zinc-300 font-medium truncate">{nombre}</span>
+      </TopBar>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
-
+      <Main>
         {errorCarga ? (
-          <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-            {errorCarga}
-          </div>
+          <Alert tone="error">{errorCarga}</Alert>
         ) : cargando ? (
           <div className="text-zinc-600 text-sm">Cargando…</div>
         ) : (
           <>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
+            <Card className="mb-6">
               <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <h1 className="text-2xl font-bold text-white">{nombre}</h1>
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-bold text-white truncate">{nombre}</h1>
                   <div className="flex flex-col gap-1 mt-1">
                     {licencias[0]?.nombre_contacto && (
-                      <p className="text-zinc-300 text-sm font-medium">👤 {licencias[0].nombre_contacto}</p>
+                      <p className="text-zinc-300 text-sm font-medium flex items-center gap-1.5"><User size={13} /> {licencias[0].nombre_contacto}</p>
                     )}
                     {licencias[0]?.contacto && (
-                      <p className="text-zinc-500 text-sm">✉ {licencias[0].contacto}</p>
+                      <p className="text-zinc-500 text-sm flex items-center gap-1.5"><AtSign size={13} /> {licencias[0].contacto}</p>
                     )}
                     {licencias[0]?.telefono && (
-                      <p className="text-zinc-500 text-sm">📞 {licencias[0].telefono}</p>
+                      <p className="text-zinc-500 text-sm flex items-center gap-1.5"><Phone size={13} /> {licencias[0].telefono}</p>
                     )}
                     {!licencias[0]?.contacto && !licencias[0]?.telefono && (
                       <p className="text-zinc-600 text-sm italic">Sin datos de contacto</p>
                     )}
                   </div>
-                  {miembroDesde && (
-                    <p className="text-zinc-600 text-xs mt-1.5">Cliente desde {miembroDesde}</p>
-                  )}
+                  {miembroDesde && <p className="text-zinc-600 text-xs mt-1.5">Cliente desde {miembroDesde}</p>}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setModalEditar(true)}
-                    className="text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                    ✏️ Editar
-                  </button>
-                  <button onClick={() => setConfirmEliminarCliente(true)}
-                    className="text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-700/50 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                    🗑 Eliminar
-                  </button>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setModalEditar(true)}><Pencil size={13} /> Editar</Button>
+                  <Button variant="outline" size="sm" className="!text-red-400 !border-red-900/50 hover:!border-red-700/50 hover:!text-red-300"
+                    onClick={() => setConfirmEliminarCliente(true)}>
+                    <Trash2 size={13} /> Eliminar
+                  </Button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-4 mt-5 pt-5 border-t border-zinc-800">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-zinc-800">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-white">{maquinas.length}</div>
                   <div className="text-xs text-zinc-500 mt-1">Máquina{maquinas.length !== 1 ? 's' : ''}</div>
@@ -688,124 +585,102 @@ export default function DetalleKiosco() {
                   <div className="text-xs text-zinc-500 mt-1">Total cobrado</div>
                 </div>
               </div>
-            </div>
+            </Card>
 
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
-              <div className="flex items-center justify-between mb-5">
+            <Card className="mb-6">
+              <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
                 <div>
-                  <h2 className="font-semibold text-white">💰 Cobros</h2>
+                  <h2 className="font-semibold text-white flex items-center gap-2"><Wallet size={16} /> Cobros</h2>
                   <p className="text-zinc-600 text-xs mt-0.5">Registrá los pagos reales, independientemente de la licencia</p>
                 </div>
-                <button onClick={() => setModalPago(true)}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  + Registrar cobro
-                </button>
+                <Button variant="ghost" size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white" onClick={() => setModalPago(true)}>
+                  <Plus size={14} /> Registrar cobro
+                </Button>
               </div>
 
               {pagos.length === 0 ? (
                 <div className="text-center py-8 text-zinc-600">
-                  <div className="text-3xl mb-2">💸</div>
+                  <Coins size={28} className="mx-auto mb-2 text-zinc-700" />
                   <p className="text-sm">Todavía no hay cobros registrados para este cliente.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {pagos.map(p => (
-                    <div key={p.id} className="flex items-center justify-between bg-zinc-800/60 rounded-xl px-4 py-3 group">
-                      <div>
+                    <div key={p.id} className="flex items-center justify-between bg-zinc-800/60 rounded-xl px-4 py-3 group gap-2">
+                      <div className="min-w-0">
                         <div className="text-white text-sm font-medium">{p.pagado_en}</div>
-                        <div className="text-zinc-500 text-xs mt-0.5">
-                          {p.metodo}{p.nota ? ` · ${p.nota}` : ''}
-                        </div>
+                        <div className="text-zinc-500 text-xs mt-0.5 truncate">{p.metodo}{p.nota ? ` · ${p.nota}` : ''}</div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <span className="text-emerald-400 font-bold">{formatPrecio(p.monto)}</span>
-                        <button onClick={() => eliminarPago(p.id)}
-                          className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">
-                          ✕
+                        <button onClick={() => eliminarPago(p.id)} className="text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                          <X size={14} />
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {mostrarForm && (
-              <form onSubmit={renovar} className="bg-zinc-900 border border-blue-500/20 rounded-2xl p-6 mb-6 fade-in">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="font-semibold text-blue-400">Renovar licencia</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+              <form onSubmit={renovar} className="bg-zinc-900 border border-blue-500/20 rounded-2xl p-5 sm:p-6 mb-6 fade-in">
+                <div className="flex items-center justify-between mb-5 gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-blue-400 flex items-center gap-2"><RotateCw size={15} /> Renovar licencia</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5 truncate">
                       {nombreMaqSel ? `Máquina: ${nombreMaqSel}` : `Machine ID: ${machineIdSel}`}
                     </p>
                     {solicitudId && (
-                      <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                        📨 Desde solicitud de activación remota
-                      </span>
+                      <Badge tone="blue" className="mt-1.5"><Inbox size={11} /> Desde solicitud de activación remota</Badge>
                     )}
                   </div>
                   <button type="button" onClick={() => { setMostrarForm(false); setMsg(null); setLicRenovada(null); setSolicitudId(null) }}
-                    className="text-zinc-600 hover:text-white text-sm">✕</button>
+                    className="text-zinc-600 hover:text-white shrink-0"><X size={16} /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Desde *</label>
-                    <input className={inp} required type="date" value={form.desde}
-                      onChange={e => setForm(f => ({ ...f, desde: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Hasta *</label>
-                    <input className={inp} required type="date" value={form.hasta}
-                      onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Precio ($)</label>
-                    <input className={inp} type="number" min="0" value={form.precio} placeholder="Opcional"
-                      onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Notas</label>
-                    <input className={inp} value={form.notas} placeholder="Opcional"
-                      onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
-                  </div>
+                  <Field label="Desde *">
+                    <Input accent="blue" required type="date" value={form.desde} onChange={e => setForm(f => ({ ...f, desde: e.target.value }))} />
+                  </Field>
+                  <Field label="Hasta *">
+                    <Input accent="blue" required type="date" value={form.hasta} onChange={e => setForm(f => ({ ...f, hasta: e.target.value }))} />
+                  </Field>
+                  <Field label="Precio ($)">
+                    <Input accent="blue" type="number" min="0" value={form.precio} placeholder="Opcional" onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
+                  </Field>
+                  <Field label="Notas">
+                    <Input accent="blue" value={form.notas} placeholder="Opcional" onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+                  </Field>
                 </div>
-                {msg && (
-                  <div className={`text-sm px-3 py-2 rounded-lg mb-4 ${
-                    msg.tipo === 'ok' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                  }`}>{msg.texto}</div>
-                )}
+                {msg && <Alert tone={msg.tipo} className="mb-4">{msg.texto}</Alert>}
                 {licRenovada ? (
                   <>
                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 mb-4">
                       <code className="text-blue-300 text-xs font-mono break-all">{licRenovada.licenciaKey}</code>
                     </div>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => navigator.clipboard.writeText(licRenovada.licenciaKey)}
-                        className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white py-2.5 rounded-xl text-sm">
-                        📋 Copiar clave
-                      </button>
-                      <button type="button" disabled={!licencias[0]?.contacto}
-                        onClick={() => enviarEmailLic(licRenovada, setLoading, setMsg)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm">
-                        ✉ Enviar email
-                      </button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button type="button" variant="ghost" className="flex-1" onClick={() => navigator.clipboard.writeText(licRenovada.licenciaKey)}>
+                        <Copy size={15} /> Copiar clave
+                      </Button>
+                      <Button type="button" variant="primary" accent="blue" className="flex-1" disabled={!licencias[0]?.contacto}
+                        onClick={() => enviarEmailLic(licRenovada, setLoading, setMsg)}>
+                        <Mail size={15} /> Enviar email
+                      </Button>
                     </div>
                   </>
                 ) : (
-                  <button type="submit" disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl text-sm">
+                  <Button type="submit" variant="primary" accent="blue" className="w-full" disabled={loading}>
                     {loading ? 'Renovando…' : 'Renovar licencia'}
-                  </button>
+                  </Button>
                 )}
               </form>
             )}
 
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-white">🖥 Máquinas</h2>
-              <button onClick={() => { setModalNuevaMaq(true); setFormNueva(FORM_INICIAL); setMsgNueva(null); setLicNueva(null); setSolicitudId(null) }}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                + Agregar máquina
-              </button>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h2 className="font-semibold text-white flex items-center gap-2"><MonitorSmartphone size={16} /> Máquinas</h2>
+              <Button variant="ghost" size="sm" onClick={() => { setModalNuevaMaq(true); setFormNueva(FORM_INICIAL); setMsgNueva(null); setLicNueva(null); setSolicitudId(null) }}>
+                <Plus size={13} /> Agregar máquina
+              </Button>
             </div>
 
             {maquinas.map(maq => {
@@ -814,28 +689,20 @@ export default function DetalleKiosco() {
               const backup       = backupEstado[maq.machineId]
 
               return (
-                <div key={maq.machineId} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-4">
-
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <p className="font-semibold text-white">
-                        {maq.ultima.nombre_maquina || 'Máquina sin nombre'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-zinc-500 text-xs bg-zinc-800 px-2 py-0.5 rounded font-mono">
-                          {maq.machineId}
-                        </code>
-                        <button onClick={() => copiar(maq.machineId)}
-                          className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors">
+                <Card key={maq.machineId} className="mb-4">
+                  <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white">{maq.ultima.nombre_maquina || 'Máquina sin nombre'}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <code className="text-zinc-500 text-xs bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{maq.machineId}</code>
+                        <button onClick={() => copiar(maq.machineId)} className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors shrink-0">
                           {copiadoId === maq.machineId ? '✓ Copiado' : 'Copiar'}
                         </button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full border ${estado.bg} ${estado.border} ${estado.text}`}>
-                        {estado.label}
-                      </span>
-                      <div className={`text-2xl font-bold mt-1 ${estado.text}`}>
+                    <div className="text-right shrink-0">
+                      <Badge tone={estado.tone}>{estado.label}</Badge>
+                      <div className={`text-2xl font-bold mt-1 ${estado.tone === 'red' ? 'text-red-400' : estado.tone === 'yellow' ? 'text-yellow-400' : 'text-green-400'}`}>
                         {estado.dias < 0 ? `Venció hace ${Math.abs(estado.dias)}d` : `${estado.dias} días`}
                       </div>
                       <div className="text-zinc-600 text-xs">Vence: {maq.ultima.vence}</div>
@@ -843,18 +710,20 @@ export default function DetalleKiosco() {
                   </div>
 
                   {/* ── Backup en la nube ── */}
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 mb-5 flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <p className="text-sm text-zinc-300 font-medium">☁️ Backup en la nube</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">
-                        La app sube uno solo por día. Usalo si el cliente necesita restaurar en otra PC.
-                      </p>
-                      {backup?.error && <p className="text-xs text-red-400 mt-1">{backup.error}</p>}
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 mb-5 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <Cloud size={16} className="text-zinc-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm text-zinc-300 font-medium">Backup en la nube</p>
+                        <p className="text-xs text-zinc-600 mt-0.5">
+                          La app sube uno solo por día. Usalo si el cliente necesita restaurar en otra PC.
+                        </p>
+                        {backup?.error && <p className="text-xs text-red-400 mt-1">{backup.error}</p>}
+                      </div>
                     </div>
-                    <button onClick={() => descargarBackup(maq.machineId)} disabled={backup?.loading}
-                      className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 text-xs font-medium px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
-                      {backup?.loading ? 'Buscando…' : '⬇ Descargar backup'}
-                    </button>
+                    <Button variant="ghost" size="sm" disabled={backup?.loading} onClick={() => descargarBackup(maq.machineId)} className="whitespace-nowrap shrink-0">
+                      <CloudDownload size={14} /> {backup?.loading ? 'Buscando…' : 'Descargar backup'}
+                    </Button>
                   </div>
 
                   {!mostrarForm && (
@@ -866,48 +735,30 @@ export default function DetalleKiosco() {
                       setSolicitudId(null)
                       window.scrollTo({ top: 0, behavior: 'smooth' })
                     }}
-                      className="text-xs text-blue-400 hover:text-blue-300 border border-blue-400/30 hover:border-blue-400/60 px-3 py-1.5 rounded-lg transition-colors mb-5">
-                      ↻ Renovar esta máquina
+                      className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 border border-blue-400/30 hover:border-blue-400/60 px-3 py-1.5 rounded-lg transition-colors mb-5">
+                      <RotateCw size={12} /> Renovar esta máquina
                     </button>
                   )}
 
                   <div>
                     <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">
                       Historial · {maq.licencias.length} emisión{maq.licencias.length !== 1 ? 'es' : ''}
-                      {totalMaqPago > 0 && (
-                        <span className="text-blue-400 ml-2">· {formatPrecio(totalMaqPago)} precio total</span>
-                      )}
+                      {totalMaqPago > 0 && <span className="text-blue-400 ml-2">· {formatPrecio(totalMaqPago)} precio total</span>}
                     </p>
                     <div className="space-y-1.5">
                       {maq.licencias.map((lic, j) => {
                         const est        = getEstado(lic.vence)
                         const emailState = emailHistorial[lic.id]
                         return (
-                          <div key={lic.id}
-                            className="bg-zinc-800/50 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
-
-                            <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${
-                              j === 0
-                                ? `${est.bg} ${est.border} ${est.text}`
-                                : 'bg-zinc-800 border-zinc-700 text-zinc-600'
-                            }`}>
-                              {j === 0 ? est.label : 'Histórica'}
-                            </span>
-
+                          <div key={lic.id} className="bg-zinc-800/50 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+                            <Badge tone={j === 0 ? est.tone : 'zinc'}>{j === 0 ? est.label : 'Histórica'}</Badge>
                             <span className="text-zinc-400 text-xs">{lic.desde} → {lic.vence}</span>
+                            {lic.precio > 0 && <span className="text-zinc-500 text-xs">{formatPrecio(lic.precio)}</span>}
+                            {lic.notas && <span className="text-zinc-600 text-xs italic truncate max-w-[180px]">{lic.notas}</span>}
 
-                            {lic.precio > 0 && (
-                              <span className="text-zinc-500 text-xs">{formatPrecio(lic.precio)}</span>
-                            )}
-
-                            {lic.notas && (
-                              <span className="text-zinc-600 text-xs italic truncate max-w-[180px]">{lic.notas}</span>
-                            )}
-
-                            <div className="ml-auto flex items-center gap-2">
-                              <button onClick={() => copiarKey(lic)}
-                                className="text-zinc-500 hover:text-white text-xs transition-colors">
-                                {copiadoKey === lic.id ? '✓ Copiado' : '📋 Clave'}
+                            <div className="ml-auto flex items-center gap-3">
+                              <button onClick={() => copiarKey(lic)} className="text-zinc-500 hover:text-white text-xs transition-colors flex items-center gap-1">
+                                {copiadoKey === lic.id ? <Check size={13} /> : <Copy size={13} />}
                               </button>
                               {licencias[0]?.contacto && (
                                 <button
@@ -923,29 +774,30 @@ export default function DetalleKiosco() {
                                           licenciaKey: lic.licencia_key, vence: lic.vence,
                                         }),
                                       })
-                                      setEmailHistorial(prev => ({ ...prev, [lic.id]: { msg: res.ok ? '✅ Enviado' : '❌ Error' } }))
+                                      setEmailHistorial(prev => ({ ...prev, [lic.id]: { msg: res.ok ? '✓' : '✕' } }))
                                     } catch {
-                                      setEmailHistorial(prev => ({ ...prev, [lic.id]: { msg: '❌ Error' } }))
+                                      setEmailHistorial(prev => ({ ...prev, [lic.id]: { msg: '✕' } }))
                                     }
                                   }}
-                                  className="text-zinc-500 hover:text-blue-400 text-xs transition-colors disabled:opacity-50">
-                                  {emailState?.loading ? '…' : emailState?.msg || '✉'}
+                                  className="text-zinc-500 hover:text-blue-400 text-xs transition-colors disabled:opacity-50" title="Enviar por email">
+                                  {emailState?.loading ? '…' : emailState?.msg || <Mail size={13} />}
                                 </button>
                               )}
-                              <button onClick={() => setConfirmEliminarLic(lic.id)}
-                                className="text-zinc-700 hover:text-red-400 text-xs transition-colors">✕</button>
+                              <button onClick={() => setConfirmEliminarLic(lic.id)} className="text-zinc-700 hover:text-red-400 transition-colors">
+                                <X size={13} />
+                              </button>
                             </div>
                           </div>
                         )
                       })}
                     </div>
                   </div>
-                </div>
+                </Card>
               )
             })}
           </>
         )}
-      </div>
-    </div>
+      </Main>
+    </Shell>
   )
 }
